@@ -66,8 +66,8 @@ const IDLE_FIRE = { overlap: 0.25, pool: 3, every: 4.75 };   // 節拍改由 SWI
     ⚠️ 芯的 width 就是**看起來的線寬**。光暈的 opacity 壓低（0.2 上下）才是暈開的感覺，
        調太高會變成一條粗線。 */
 const ROUTE_BOOST = [
-  { width: 5,   opacity: 0.12, add: true  },   // 外圈光暈：暈開就好，不要有明顯的邊
-  { width: 1.8, opacity: 1,    add: false },   // 實心的芯：這條決定看起來多粗、什麼顏色
+  { width: 3.4, opacity: 0.11, add: true  },   // 外圈光暈：暈開就好，不要有明顯的邊
+  { width: 1.2, opacity: 1,    add: false },   // 實心的芯：這條決定看起來多粗、什麼顏色
 ];
 
 /** 前言／結語頁動線兩端的標記：起點圓點 → 細虛線 → 箭頭 → 出口標誌。
