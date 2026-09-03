@@ -209,10 +209,13 @@ server.listen(PORT, () => {
   console.log(`serving ${ROOT} → http://localhost:${PORT}`);
   const urls = lanURLs();
   if (urls.length) {
-    console.log('\n同一個 Wi-Fi 下，Pad 開這個網址：');
-    for (const u of urls) console.log(`  ${u}/pad.html`);
-    console.log('主展示端就開：');
+    console.log('\n主展示端開這個網址：');
     for (const u of urls) console.log(`  ${u}/`);
+    // Pad 是另一個 repo（VistwinProject/G-pad），它連回來的時候要指定「主機是哪一台」，
+    // 所以這裡直接把 ?server= 該填什麼印出來，現場不用自己去查 IP。
+    console.log('');
+    console.log('Pad（G-pad）開它自己的網址，後面加上：');
+    for (const u of urls) console.log(`  ?server=${u.replace('http://', '')}`);
   }
   console.log('');
 });
