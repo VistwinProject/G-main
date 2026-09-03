@@ -2,6 +2,8 @@
 
 Three.js 展場網頁。兩頁：**火災黃金30秒**（倒數）與**首頁**（逃生動線示範）。
 
+> 這是**主展示端**（大螢幕看板）。住戶端 Pad 在 [VistwinProject/G-pad](https://github.com/VistwinProject/G-pad)。
+
 ## 開機流程
 
 **歡迎頁一律是「火災黃金30秒」** —— 不管是重新整理還是別人拿網址進來，第一眼看到的都是它。
@@ -16,14 +18,17 @@ Three.js 展場網頁。兩頁：**火災黃金30秒**（倒數）與**首頁**�
 - 要改流程改 `js/main.js` 最上面的 `WELCOME_FROM` / `WELCOME_TO`；不想自動跳就把
   `createCountdown` 的 `onEnd` 拿掉。
 
-## 住戶端 Pad（pad.html）＋ 兩台裝置的即時同步
+## 住戶端 Pad（另一個 repo）＋ 兩台裝置的即時同步
 
-同一個 Wi-Fi 下，**主展示端**（`index.html`）換場景／跑動線，**Pad**（`pad.html`）就跟著換畫面。
+同一個 Wi-Fi 下，**主展示端**（這個 repo）換場景／跑動線，**Pad** 就跟著換畫面。
+
+⚠️ **Pad 端的程式在 [VistwinProject/G-pad](https://github.com/VistwinProject/G-pad)**，不在這個 repo 裡。
+   WebSocket 轉播站（`/ws`）在這邊 —— 現場只跑這一台 server，Pad 連過來。
 
 ```
 node server.mjs 5280        # 開機時會印出區域網路的網址
   主展示端  http://<這台的 IP>:5280/
-  Pad      http://<這台的 IP>:5280/pad.html
+  Pad      在 G-pad 那台開它自己的網址，後面加 ?server=<這台的 IP>:5280
 ```
 
 ### 傳輸
