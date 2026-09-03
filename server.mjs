@@ -85,7 +85,8 @@ const server = createServer(async (req, res) => {
 
 /* =========================================================================
    WebSocket 轉播站（/ws）
-   主展示網站（index.html）把「目前場景 + 動線」丟上來，Pad（pad.html）收到就同步。
+   主展示網站（index.html）把「目前場景 + 動線」丟上來，Pad 收到就同步。
+   Pad 的程式在另一個 repo（VistwinProject/G-pad），它用 ?server= 連到這台的 /ws。
 
    為什麼是手刻不是裝 ws / socket.io：這個專案從頭到尾**零套件**（three.js 走 importmap CDN），
    現場是一台筆電開熱點跑 node server.mjs 就要能動，不能假設有 npm install 過。

@@ -39,7 +39,7 @@ const pageEls = new Map(
   PAGES.map((id) => [id, document.querySelector(`.page[data-page="${id}"]`)])
 );
 
-/* 住戶端 Pad（pad.html）的即時同步。
+/* 住戶端 Pad 的即時同步。Pad 的程式在另一個 repo：VistwinProject/G-pad。
    這一頁是**主控端**：只送不收，Pad 只收不送。走 WebSocket（js/sync.js → server.mjs 的 /ws）。
    ⚠️ 不能用 localStorage —— 那個只在同一台瀏覽器裡有效，跨裝置傳不過去。
    ⚠️ 頁面代號跟給 Pad 的場景名不一樣（first / home 是歷史包袱），這張表就是兩邊的對照。 */
