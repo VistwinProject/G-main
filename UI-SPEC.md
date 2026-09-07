@@ -87,7 +87,7 @@ html{ font-size:max(8px, min(.8333vw, 1.4814vh)) }   /* 1920×1080 時 = 16px */
 | `.intro__title` `<em>` | 每一秒 | Noto Sans TC | **5.1rem / 81.6px** | 700 | .06em | `--brand-hi` |
 | `.intro__title` 右段 | 都是關鍵 | Noto Sans TC | 3.57rem / 57.1px | 700 | .086em | `--brand-hi` |
 | `.intro__lead` | 從即時感知到智慧引導，讓安全更早一步。 | Noto Sans TC | 1.864rem / 29.8px | 400 | .08em | `--ink-2` |
-| `.intro__sign` | **寶鋪**讓每一秒，都多一分安心。 | Noto Sans TC | 1.791rem / 28.7px | 400 | .55em | `--brand-hi` 70% |
+| `.intro__sign` | **寶舖**讓每一秒，都多一分安心。 | Noto Sans TC | 1.791rem / 28.7px | 400 | .55em | `--brand-hi` 70% |
 
 - 主標行高 1.3，三段**對齊基線**；左右兩段是 `font-size:.7em`（相對中間那段）
 - 輪播三段**底部對齊**（`align-items:flex-end`）
@@ -173,7 +173,7 @@ html{ font-size:max(8px, min(.8333vw, 1.4814vh)) }   /* 1920×1080 時 = 16px */
 | `.intro__title` `<em>` | **領先** | 5.1rem / 81.6px |
 | `.intro__title` 右段 | 危險一步 | 3.57rem / 57.1px |
 | `.intro__lead` | 從感知、判斷到引導，讓 AI 守護每一個回家的日常。 | 1.9rem / 30.4px |
-| `.intro__sign` | **寶鋪**以智慧守護家的每一秒。 | 1.3rem / 20.8px |
+| `.intro__sign` | **寶舖**以智慧守護家的每一秒。 | 1.3rem / 20.8px |
 
 字體、字重、字距、顏色都跟前言頁一致（見第 1 節）。
 ⚠️ 結語的 `.intro__sign` 是 1.3rem、前言是 1.791rem —— 差別來自前言那邊的 `--sign-k` 補償係數。

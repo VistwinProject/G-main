@@ -22,6 +22,9 @@ Three.js 展場網頁。兩頁：**火災黃金30秒**（倒數）與**首頁**�
 
 同一個 Wi-Fi 下，**主展示端**（這個 repo）換場景／跑動線，**Pad** 就跟著換畫面。
 
+⚠️ 而且是**雙向**的：Pad 上的兩個手動操作（待機頁點一下、警報頁往上滑）會推回來，
+   這一頁跟著換頁（見 `js/main.js` 的 `SCENE_PAGE` / `onState`）。以前是「只送不收」。
+
 ⚠️ **Pad 端的程式在 [VistwinProject/G-pad](https://github.com/VistwinProject/G-pad)**，不在這個 repo 裡。
    WebSocket 轉播站（`/ws`）在這邊 —— 現場只跑這一台 server，Pad 連過來。
 
@@ -60,12 +63,12 @@ node server.mjs 5280        # 開機時會印出區域網路的網址
 
 | 主展示端頁面 | 送出的場景 | Pad 顯示 |
 | --- | --- | --- |
-| intro | `intro` | 藍．系統待機中／安全 |
-| first | `golden30` | **紅．偵測到火災／請立即疏散** |
-| home | `aiRoute` | 琥珀．AI 智慧分流／**請前往 X 出口** + 三步驟指引 |
+| intro | `intro` | 藍．鎖屏式待機頁（時間／居家狀態／三張狀態卡） |
+| first | `golden30` | **紅．火災警報**：會閃的警報鈴＋倒數＋「AI 正在分析安全路線」 |
+| home | `aiRoute` | 藍．**請前往 X 出口** + 迷你平面圖 + 會跑的小人 |
 | outro | `outro` | 綠．疏散完成／已離開危險區域 |
 
-送出去的內容：`{ scene, phase, route, exit, ts }`。
+送出去的內容：`{ scene, phase, route, exit, anim, now, ts }`。
 `phase` 是 `idle` / `running` / `cleared`，`exit` 是建議出口（`'A'` / `'B'`，
 規則跟右上狀態面板一樣：動線 1/2/3 走 A、4/5 走 B）。
 
@@ -73,13 +76,44 @@ node server.mjs 5280        # 開機時會印出區域網路的網址
 那時候主展示端根本還沒挑動線，報了就是假資訊，現場住戶照著走會出事。
 `aiRoute` 跑完（`phase: 'cleared'`）Pad 會先轉成綠色的「已抵達 X 出口」。
 
+### 對時：讓 Pad 跟這邊跑同一個節拍
+
+Pad 有兩個東西要跟大螢幕同步：警報頁的**倒數秒數**、出口頁**動線上的小人**。
+不是每一格都傳，而是告訴它「這段動畫什麼時候開始的、要跑幾秒」：
+
+```
+anim : { kind:'count'|'route', t0:<開始時的 Date.now()>, dur:<秒> }
+now  : <送出當下的 Date.now()>
+```
+
+Pad 算 `已跑秒數 = now - t0`，之後自己用 rAF 往前推。
+
+- `count` —— 每一輪倒數開始時送（`countdown.js` 的 `onCycle`，從 `reset()` 打出來）
+- `route` —— 按下「展示逃生動線」時送，`dur` 就是 `playRoute` 實際用的秒數
+
+⚠️ 一定要一起送 `now`。`t0` 是**這台**的時鐘，Pad 那台的系統時間不見得一樣，
+   讓它拿自己的 `Date.now()` 去減會差好幾秒甚至好幾分鐘。
+
+⚠️ 動畫進行中**每秒補推一次**（`HEARTBEAT`）。轉播站只存最後一份狀態、有人連上就補送；
+   不補推的話，Pad 晚開機／重連拿到的是一份 `now` 很舊的狀態，進度會停在當初推的那一刻。
+   補推時 `t0` **不變**，Pad 那邊差不到 0.25 秒就不重設基準，畫面才不會每秒抽一下。
+
+⚠️ 動畫結束就把 `anim` 設回 `null`（通關、離開首頁、離開第一頁），Pad 才知道要收掉計時器。
+
+⚠️ 這是**跨 repo 的約定**，Pad 那邊在 `js/pad.js` 的 `setAnim()`。改了兩邊都要動。
+
 ### Pad 的畫面
 
-四個狀態（`safe` / `alarm` / `guide` / `clear`）全部靠 `body[data-state]` 換色和動畫，
-`js/pad.js` 只改那一個屬性和幾段文字，不動結構。右上角有連線指示燈（斷線轉紅閃爍）。
-⚠️ 警報狀態是**標題呼吸**不是整片閃 —— 整片閃在 Pad 上很吵，也容易讓人不舒服。
+配色靠 `body[data-state]`（`safe` / `alarm` / `guide` / `clear`），版面靠 `body[data-view]`
+（`idle` 待機／`alarm` 火災警報／`notice` 前往 X 出口／`plain` 結語）。
+`js/pad.js` 只改這兩個屬性和幾段文字，不動結構。連線指示燈在上緣（斷線轉紅閃爍；
+待機頁上它就是那個訊號圖示）。
+⚠️ 警報是**警報鈴呼吸**不是整片閃 —— 整片閃在 Pad 上很吵，也容易讓人不舒服。
+⚠️ Pad 的迷你平面圖是「一層切平面」那顆模型的**正射俯視投影**，動線用的是
+`models/routes-home.json`（首頁真的在跑的那一份），由 G-pad 的 `tools/extract-plan.mjs`
+烤成靜態資料。**動線或模型改了，那邊要重跑一次**，不然 Pad 的圖會跟大螢幕對不上。
 ⚠️ `css/pad.css` 會把 `style.css` 的 `html{font-size}` 整支蓋掉：那支是給 1920×1080 看板算的
-（取 vw/vh 較小者），Pad 直向時會算出很小的 rem。Pad 改用 `vmin` 為基準。
+（取 vw/vh 較小者），Pad 直向時會算出很小的 rem。Pad 改用**版面盒子的寬度**為基準。
 色票還是共用 `style.css` 的 `:root`，換主題色兩邊會一起變。
 
 ## 前言頁（A）
@@ -164,7 +198,7 @@ viewer.setRoutesVisible('flat', id !== 'intro');   // js/main.js 的 goto()
 | 標籤 | 結語 · OUTRO |
 | 主標 | 預見風險才能領先**危險一步**（跟前言一樣：一行、後段用 `<em>` 放大跳出來） |
 | 副標 | 從感知、判斷到引導，讓 AI 守護每一個回家的日常。 |
-| 結語 | **寶鋪**以智慧守護家的每一秒。 |
+| 結語 | **寶舖**以智慧守護家的每一秒。 |
 
 **平面圖的動線是開著的**（前言頁才收起來），所以會看到逃生動線每 2 秒換一條 ——
 `viewer.setRoutesVisible('flat', id !== 'intro')`，第一頁和結語頁都是 true。

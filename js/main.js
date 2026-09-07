@@ -40,12 +40,80 @@ const pageEls = new Map(
 );
 
 /* 住戶端 Pad 的即時同步。Pad 的程式在另一個 repo：VistwinProject/G-pad。
-   這一頁是**主控端**：只送不收，Pad 只收不送。走 WebSocket（js/sync.js → server.mjs 的 /ws）。
+   走 WebSocket（js/sync.js → server.mjs 的 /ws）。
+   ⚠️ 現在是**雙向**的：這一頁換頁會推給 Pad，Pad 手動操作（待機頁點一下、
+      警報頁往上滑）也會推回來、這一頁跟著換。以前是「只送不收」，已經不是了。
    ⚠️ 不能用 localStorage —— 那個只在同一台瀏覽器裡有效，跨裝置傳不過去。
    ⚠️ 頁面代號跟給 Pad 的場景名不一樣（first / home 是歷史包袱），這張表就是兩邊的對照。 */
 const PLAN_DIM = 0.18;                      // 前言／結語頁的平面圖建物壓到幾成（動線不受影響）
 const SCENE = { intro: 'intro', first: 'golden30', home: 'aiRoute', outro: 'outro' };
-const sync = createSync({ role: 'display' });
+/* Pad 那邊現在也可以手動操作（待機頁點一下、警報頁往上滑），操作會送回轉播站。
+   這裡收下來、跟著換頁 —— 不然兩邊會各看各的。
+
+   ⚠️ 這是**雙向**的：以前 Pad 只收不送、主展示端只送不收。現在誰動都會帶著對方走。
+   ⚠️ 不會打回圈：goto() 開頭就 `id === current` 直接 return，
+      所以「收到 → goto → pushSync → 對方收到 → goto」在第二步就停了。
+      轉播站也不會把訊息轉回給發送者本人。 */
+const SCENE_PAGE = { intro: 'intro', golden30: 'first', aiRoute: 'home', outro: 'outro' };
+
+/* Pad 上的按鈕送過來的指令。對到的就是這一頁畫面上那兩顆「展示／切換逃生動線」
+   —— 同一個 playRouteDemo()，不要另外寫一套，不然兩邊的行為會慢慢長歪。
+     route-play：重複目前這一條（Pad 出口頁的 ▶）
+     route-next：隨機換一條（Pad 出口頁的 ⇄，以及 App 頁的「逃生指引」） */
+const PAD_CMD = {
+  'route-play': () => playRouteDemo(true),
+  'route-next': () => playRouteDemo(false),
+};
+/* ⚠️ 指令一定要靠 cmdId 判斷「是不是一個**新**指令」，不能直接看 s.cmd。
+      轉播站是把最後一份狀態存起來、誰連上就補送一份，所以指令會**一直留在共用狀態裡**。
+      直接看 s.cmd 的話，這一頁每次重新整理或斷線重連都會再跑一次動線
+      —— 現場會變成「大螢幕自己莫名開始跑」。
+   ⚠️ 而且**第一次**收到狀態只記住序號、不執行：那一份是轉播站補送的歷史，
+      不是使用者剛剛按的。 */
+let padCmdSeen = null;
+let padCmdReady = false;
+
+const sync = createSync({
+  role: 'display',
+  onState: (s) => {
+    /* ⚠️ 一定要包 try/catch。這個 callback 是從 WebSocket 的 onmessage 裡叫的，
+       而 goto() 會碰到 current / pageEls / countdown / viewer 一整串模組層級的東西。
+       模組初始化如果中途失敗（例如這台開不了 WebGL，new Viewer() 直接拋），
+       後面那個 current 就停在 TDZ，每收到一份狀態都會炸
+       「Cannot access current before initialization」，而且是炸在 socket 的處理器裡。
+       換頁失敗頂多兩邊畫面不同步，不該把連線的處理流程一起搞壞。 */
+    const page = SCENE_PAGE[s?.scene];
+    if (page) {
+      // 留一行 log：現場才分得出來是「根本沒收到」還是「收到了但沒換頁」
+      console.log('[sync] 收到狀態 scene=' + s.scene + ' → goto(' + page + ')');
+      try { goto(page); }            // 同一頁的話 goto 自己會忽略
+      catch (e) { console.warn('[sync] 跟著 Pad 換頁失敗（頁面還沒初始化完？）', e); }
+    }
+
+    // ── Pad 按的按鈕 ──（順序在 goto 之後：動線要有舞台，得先站在首頁上）
+    const id = s?.cmdId ?? null;
+    if (!padCmdReady) { padCmdReady = true; padCmdSeen = id; return; }  // 剛連上，只記住
+    if (!s?.cmd || id === padCmdSeen) return;                          // 舊的、或沒有指令
+    padCmdSeen = id;
+    console.log('[sync] Pad 按了 ' + s.cmd);
+    try { PAD_CMD[s.cmd]?.(); }
+    catch (e) { console.warn('[sync] 執行 Pad 的指令失敗', e); }
+  },
+});
+
+/* Pad 要跟大螢幕「跑同一個節拍」（倒數的秒數、動線上小人的位置）就得對時。
+   做法：這裡把**目前這段動畫是什麼時候開始的、要跑多久**一起送過去，
+   Pad 收到就能自己用 rAF 算，不必每一格都送。
+
+     anim = { kind:'count'|'route', t0: 開始的 Date.now(), dur: 秒 }
+
+   ⚠️ t0 是**這台**的時鐘，Pad 那台的時鐘不見得一樣。所以還要送一個 now
+      （送出的當下），Pad 用 now - t0 算「已經跑了多久」，跟兩台的時差無關。
+   ⚠️ 轉播站會把最後一次的狀態存起來、有人連上就補送。所以動畫進行中要
+      **定時再推一次**（HEARTBEAT），不然 Pad 晚開機／重連時拿到的是一份
+      now 很舊的狀態，算出來的進度會停在當初推的那一刻。 */
+let anim = null;
+const HEARTBEAT = 1000;
 
 /** 把目前狀態推給 Pad。切頁、開始跑動線、通關、回待機都要叫一次。 */
 function pushSync() {
@@ -57,8 +125,13 @@ function pushSync() {
     // 建議出口＝動線 1/2/3 走 A、4/5 走 B（跟右上狀態面板同一條規則）。
     // 還沒開始跑就送 null —— Pad 那邊寧可顯示「規劃中」也不要報一個假的出口。
     exit: live && lastRoute >= 0 ? (EXIT_A_ROUTES.includes(lastRoute) ? 'A' : 'B') : null,
+    anim,
+    now: Date.now(),
   });
 }
+
+// 動畫進行中定時補推一次，讓轉播站存的那份狀態不會過期（見上面的 ⚠️）
+setInterval(() => { if (anim) pushSync(); }, HEARTBEAT);
 
 /* 倒數：總長和分幾段。第一頁的逃生動線輪播要知道「一段有多長」，
    才能判斷這一段還放不放得下完整的一條（見 viewer.setRoutePhase）。 */
@@ -91,6 +164,8 @@ const countdown = createCountdown({
     welcomeDone = true;
     goto(WELCOME_TO);
   },
+  // 每一輪倒數開始就把基準時間推給 Pad，兩邊才會倒同一個數
+  onCycle: (dur) => { anim = { kind: 'count', t0: Date.now(), dur }; pushSync(); },
 });
 
 /* 前言頁的紅點：**擺在隨機一條逃生動線的起點上**，不是寫死的座標。
@@ -259,7 +334,7 @@ function goto(id) {
   if (id !== 'home') { resetRouteDemo(); stopIdleFx(); }    // 離開首頁：收掉動線、關掉通關訊息、主色回原本的
   if (id === 'home') { startIdleFx(); showIdleFire(); }     // 進首頁：待機的起火點 + 標語換色 + 按鈕抽動
   if (id === 'first') countdown.start();
-  else countdown.pause();
+  else { countdown.pause(); if (anim?.kind === 'count') anim = null; }   // 倒數停了，Pad 也別再倒
 
   // 同一顆 renderer 搬到當前頁的 3D 容器，其餘頁面就卸下來
   // 兩頁的佔位模型不同：第一頁是單層平面圖，首頁是三層大樓
@@ -554,8 +629,9 @@ function playRouteDemo(repeat) {
     setFireTag(false);                        // 回到紅色的「已辨識」
     setTheme('red');                          // 跑動線的這幾秒：整個介面轉紅
     routeState = 'running';
+    let runDur = 0;                           // 這一條實際跑幾秒，下面要一起送給 Pad
     lastRoute = viewer.playRoute('tower', {
-      duration: (i, len) => routeSeconds(len),  // 點等速：秒數只看路徑長度
+      duration: (i, len) => (runDur = routeSeconds(len)),  // 點等速：秒數只看路徑長度
       index: (repeat && cur >= 0) ? cur : null, // 展示＝重複目前這一條；切換＝交給下面隨機挑
       avoidCurrent: !repeat,                    // 切換時避開上一次播的那一條
       avoid: repeat ? -1 : cur,                 // 切換時也避開「目前這一條」（待機正在冒煙的那條）
@@ -564,6 +640,7 @@ function playRouteDemo(repeat) {
       camHold: CAM_HOLD,                      // 鏡頭在每個關鍵影格停一下再轉
       onDone: () => {
         routeState = 'cleared';
+        anim = null;                          // 跑完了：Pad 把小人停在出口就好，不用再算
         // 抵達出口先停 EXIT_HOLD 毫秒 —— 這段期間動線畫著、小人站在綠色出口上不動，
         // 讓人看清楚他到了，再黑掉切通關。中途按按鈕或離開首頁要把這個計時器取消掉。
         clearTimeout(exitTimer);
@@ -584,6 +661,8 @@ function playRouteDemo(repeat) {
       },
     });
     setExitTags(lastRoute);                   // playRoute 是同步回傳索引的，挑完就能更新面板
+    // Pad 的小人要跟這邊的小人跑在一起：把起跑時間和秒數一起送過去
+    anim = { kind: 'route', t0: Date.now(), dur: runDur };
     pushSync();                               // 挑好哪一條之後，Pad 才知道要報哪個出口
   });
 }
@@ -592,6 +671,7 @@ function playRouteDemo(repeat) {
 function resetRouteDemo() {
   if (routeState === 'idle') return;
   routeState = 'idle';
+  anim = null;                              // 離開首頁：動線的動畫就結束了
   clearTimeout(exitTimer);                  // 離開首頁時，還沒跳的通關就不要跳了
   viewer.stopRoute('tower');
   viewer.setAllWhite(false);                // 建物變回玻璃牆

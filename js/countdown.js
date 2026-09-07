@@ -13,6 +13,7 @@ export function createCountdown({
   urgentAt = 5,        // 剩幾秒開始加 .is-urgent（數字閃爍）
   onEnd = null,        // 倒數歸零時呼叫一次（每一輪只呼叫一次）
   onPhase = null,      // 階段變化時呼叫（0=0-10s / 1=10-20s / 2=20-30s / -1=未開始）
+  onCycle = null,      // 每一輪**開始**時呼叫。住戶端 Pad 靠這個對時，才能跟大螢幕倒同一個數
   duration = 30,
   ticks = 60,
   loop = true,
@@ -98,6 +99,7 @@ export function createCountdown({
     litCache = phaseCache = numCache = urgentCache = NaN;
     ended = false;
     paint(duration);
+    onCycle?.(duration);          // 新的一輪：Pad 要拿這個時間點當基準
   }
 
   function start() {
