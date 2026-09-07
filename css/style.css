@@ -117,6 +117,25 @@
   --ico-mix:rgba(0,0,0,.4);       /* icon 亮起時要混進去的底色 */
   --noise-blend:screen;           /* 按鈕 glitch 雜訊層的混合模式 */
   --veil:#000;                    /* 切狀態時蓋住 3D 的遮幕 */
+
+  /* ---- 設計畫布的寬度（rem）----
+     高度固定 67.5rem（= 100/1.4814），所以這一個數字就決定了畫布的比例。
+
+     ⚠️ 版面存檔的座標**不是相對視窗，是相對容器**（editor.js 的 freeze() 量的是
+        el.offsetParent，而那是 .page 的 padding box）。所以：
+            容器寬 = --canvas-w − 左右 padding
+            .page--main / --intro / --outro：−5.2rem（padding 2.6）
+            .page--home：−5.6rem（padding 2.8）
+
+     149.4 是**量出來的**，不是猜的：前言頁是置中的一欄，存檔裡 introRoll、
+     introEyebrow、introLogo 三個物件的中心點都落在容器的 72.05rem
+     ⇒ 當初的容器寬 144.1rem ⇒ 畫布 144.1 + 5.2 = 149.3rem。
+
+     ⚠️ 之前設成 144（把 138.8 那個「內容最遠」誤當成畫布寬）—— 那是**容器**的座標，
+        少算了 padding，容器整體窄 5rem，右邊那一欄就會往畫面邊緣擠。
+     ⚠️ 要調就改這一個數字，改完看前言頁那一欄有沒有置中最準（它是唯一「照定義該置中」
+        的頁，第一頁和首頁的物件都手動搬過，看不出基準）。 */
+  --canvas-w:149.4;
 }
 
 /* =========================================================
@@ -284,10 +303,11 @@ html{
      （前言頁是置中的一欄，存檔中心點在 72.05rem，×2 就是 144.1；首頁左右邊距也對得上）。
      取寬高較小者 ⇒ 畫布一定**完整**塞進視窗，多出來的部分由 body 置中留邊（letterbox）。
      144 = 100/.69444、67.5 = 100/1.4814。
+     ⚠️ 寬度改成吃 --canvas-w（下面 :root），要調就只改那一個數字。
      ⚠️ 這個數字**不能亂改** —— 它就是版面存檔的座標系。改了所有 layout*.json 都要重調。
      ⚠️ 以前這裡是 .8333vw（= 畫布 120rem 寬），比存檔實際用到的 138.8rem 窄了 18.8rem，
         所以在 16:9 開的時候右邊那一欄會被裁掉約 261px。 */
-  font-size:max(8px, min(.69444vw, 1.4814vh));
+  font-size:max(8px, min(calc(100vw / var(--canvas-w)), 1.4814vh));
   /* 全螢幕看板：不能出現捲軸，否則捲軸會改變 vw/vh 進而改變 rem */
   overflow:hidden;
 }
@@ -330,7 +350,7 @@ svg{display:block}
 /* ---------- 頁面容器 ---------- */
 /* 設計畫布本體。⚠️ 不要改回 100vw/100vh —— 那樣畫布會跟著視窗的比例變形，
    存好的版面換一個比例開就會跑掉（右邊那一欄掉出畫面就是這樣來的）。 */
-.app{position:relative;width:144rem;height:67.5rem;overflow:hidden}
+.app{position:relative;width:calc(var(--canvas-w) * 1rem);height:67.5rem;overflow:hidden}
 
 .page{
   position:absolute;inset:0;
