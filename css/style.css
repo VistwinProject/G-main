@@ -2,30 +2,151 @@
    火災黃金30秒 — THE GOLDEN 30 SECONDS
    設計基準 1920 × 1080，以 rem 隨視窗等比縮放
 
-   ⚠️ 這是 **white 分支**：白底藍字。深色版在 main。
-      色票是唯一的差異來源，改色只改下面那三個 :root 區塊。
    主色調切換：<html data-theme="blue">（預設）或 "green"
    也可在 console 執行 __setTheme('green') 即時比較
    ========================================================= */
 
-/* ---------- 白色主題（這個分支的預設） ----------
-   白底藍字。⚠️ 深色版的「亮＝重點」在白底上要**反過來**：
-   --brand-hi 變成**比 --brand 更深**的藍（標題、數字要跟白底有對比），
-   --brand 退成細框線用的中間藍。改色時記得這個角色互換，不然標題會比框線還淡。
-   ⚠️ 白底上的細框線和淡字要**加不透明度**（.22 → .28、.38 → .50），
-      不然在投影機或縮圖上會整條消失 —— 深色底吃得住的淡度，白底吃不住。 */
+/* ---------- 藍色主題（預設） ---------- */
 :root,
 :root[data-theme="blue"]{
-  --bg-0:#ffffff;        /* 基底白。留邊（letterbox）的顏色也是這個 */
+  --bg-0:#020912;
+  --bg-1:#061527;
+  --bg-2:#0a2038;
+
+  --brand:#2f9dff;
+  --brand-hi:#74d4ff;
+  --brand-line:rgba(47,157,255,.22);
+  --brand-soft:rgba(47,157,255,.13);
+
+  --glow-1:rgba(24,96,190,.32);
+  --glow-2:rgba(16,68,140,.24);
+
+  --ink:#eaf6ff;
+  --ink-2:rgba(213,238,255,.66);
+  --ink-3:rgba(178,213,245,.38);
+
+
+  /* 3D 場景（viewer.js 讀取同一組值） */
+  --m-fog:#031020;
+  --m-floor:#0a1c30;
+  --m-slab:#e4efff;      /* 首頁大樓的樓板：偏藍的白 */
+  --m-shade:#4d6a86;     /* 陰影色：通關「整棟變白」時，由上往下壓到這個色，底部才不會一片死白 */
+  --m-wall:#123049;
+  --m-edge:#74d4ff;
+  --m-grid:#2f9dff;
+  --m-grid-2:#1c4a6b;
+}
+
+/* ---------- 綠色主題（原稿） ---------- */
+:root[data-theme="green"]{
+  --bg-0:#020d08;
+  --bg-1:#06190f;
+  --bg-2:#0a2415;
+
+  --brand:#2fe27f;
+  --brand-hi:#63ffae;
+  --brand-line:rgba(47,226,127,.20);
+  --brand-soft:rgba(47,226,127,.13);
+
+  --glow-1:rgba(24,120,72,.30);
+  --glow-2:rgba(18,92,56,.22);
+
+  --ink:#eafff4;
+  --ink-2:rgba(213,255,231,.66);
+  --ink-3:rgba(180,238,210,.36);
+
+
+  --m-fog:#03130c;
+  --m-floor:#0a2417;
+  --m-slab:#e2fff0;
+  --m-shade:#3f7d63;
+  --m-wall:#123d28;
+  --m-edge:#3dffa0;
+  --m-grid:#2fe27f;
+  --m-grid-2:#1c6b45;
+}
+
+/* ---------- 紅色主題 ----------
+   首頁「展示／切換逃生動線」跑動線的那兩秒會切到這一組（js/main.js 的 playRouteDemo），
+   抵達出口就換成綠色。平常不會用到，也可以用 ?theme=red 單獨看。 */
+:root[data-theme="red"]{
+  --bg-0:#100205;
+  --bg-1:#250709;
+  --bg-2:#3a0d0e;
+
+  --brand:#ff4a3d;
+  --brand-hi:#ff9078;
+  --brand-line:rgba(255,74,61,.22);
+  --brand-soft:rgba(255,74,61,.13);
+
+  --glow-1:rgba(190,42,26,.32);
+  --glow-2:rgba(140,28,18,.24);
+
+  --ink:#fff0eb;
+  --ink-2:rgba(255,219,210,.66);
+  --ink-3:rgba(245,190,178,.38);
+
+  --m-fog:#170406;
+  --m-floor:#2a0b0d;
+  --m-slab:#ffeae3;
+  --m-shade:#8a544c;
+  --m-wall:#4a1519;
+  --m-edge:#ff9078;
+  --m-grid:#ff4a3d;
+  --m-grid-2:#6b1f22;
+}
+
+/* ---------- 語意色（不隨主題變動） ---------- */
+:root{
+  --amber:#ffb42e;     /* 警語 */
+  --red:#ff4a3d;       /* 起火點 */
+  --exit:#3dffa0;      /* 安全出口：沿用國際通用的綠色 */
+  --ease:cubic-bezier(.22,.61,.36,1);
+
+  /* 三個時段的代表色，倒數圓盤和右側階段卡共用同一組 */
+  --stage-0:var(--brand-hi);   /* 0-10 秒（剩 30-21）：藍，跟著主色走 */
+  --stage-1:#ffb42e;           /* 10-20 秒（剩 20-11）：黃 */
+  --stage-2:#ff4a3d;           /* 20-30 秒（剩 10-0）：紅 */
+
+  /* ---- 深/淺共用的鉤子（深色的值）----
+     這幾個地方原本把深色寫死在規則裡，淺色版沒辦法只靠色票覆蓋，所以抽成變數。
+     ⚠️ 值跟原本一模一樣，深色外觀不變。淺色的覆蓋在下面 [data-skin="light"]。 */
+  --grain-line:rgba(0,0,0,.16);   /* 掃描線的顏色 */
+  --grain-op:.5;                  /* 掃描線的濃度 */
+  --ico-bg:rgba(0,0,0,.35);       /* 階段卡圓形 icon 的底 */
+  --ico-mix:rgba(0,0,0,.4);       /* icon 亮起時要混進去的底色 */
+  --noise-blend:screen;           /* 按鈕 glitch 雜訊層的混合模式 */
+  --veil:#000;                    /* 切狀態時蓋住 3D 的遮幕 */
+}
+
+/* =========================================================
+   淺色版（白底藍字）—— 按 S 切換，或 ?skin=light
+   ---------------------------------------------------------
+   做法：<html data-skin="light">。這是**跟 data-theme 垂直的另一個維度** ——
+   blue / red / green 三個情境色照舊運作，只是換成淺色的那一套值。
+
+   ⚠️ 選擇器一定要**同時帶 data-skin 和 data-theme**（除了 blue 那組靠排在後面取勝）。
+      單寫 :root[data-skin="light"] 的特異性跟 :root[data-theme="green"] 一樣，
+      切到綠色時會被深綠蓋回去。
+
+   ⚠️ 深色版的「越亮＝越重點」在白底上要**反過來**：
+      --brand-hi 變成比 --brand 更深的藍（標題、數字要跟白底有對比），
+      --brand 退成細框線用的中間藍。不換角色的話標題會比框線還淡。
+   ⚠️ 細框線和淡字要**加不透明度**（.22 → .28、.38 → .50）——
+      深色底吃得住的淡度，白底吃不住，在投影機上會整條消失。
+   ========================================================= */
+:root[data-skin="light"],
+:root[data-skin="light"][data-theme="blue"]{
+  --bg-0:#ffffff;        /* 基底白。畫布留邊（letterbox）也是這個色 */
   --bg-1:#eef5fd;
   --bg-2:#e2edfa;
 
   --brand:#3f97e8;       /* 中間藍：框線、次要圖示 */
-  --brand-hi:#0b5cb8;    /* 深藍：標題、數字、重點字（白底上這支才是「重點色」） */
+  --brand-hi:#0b5cb8;    /* 深藍：標題、數字、重點字 */
   --brand-line:rgba(11,92,184,.28);
   --brand-soft:rgba(63,151,232,.16);
 
-  /* 底圖的放射漸層。⚠️ 深色版是「往亮的方向打光」，白底要反過來**往暗的方向壓**，
+  /* ⚠️ 深色版的漸層是「往亮的方向打光」，白底要反過來**往暗的方向壓**，
      不然完全看不出漸層（白色上面加白光等於沒加）。 */
   --glow-1:rgba(120,175,235,.30);
   --glow-2:rgba(90,150,215,.20);
@@ -34,90 +155,58 @@
   --ink-2:rgba(16,66,116,.72);
   --ink-3:rgba(22,74,126,.50);
 
-  /* 3D 場景（viewer.js 讀取同一組值） */
-  --m-fog:#f4f8fe;       /* 霧＝底色，遠處才會融進背景 */
+  --m-fog:#f4f8fe;       /* 霧＝底色，遠處才融進背景 */
   --m-floor:#e6eef8;
-  --m-slab:#d8e7f7;      /* 樓板：白底上不能再用白，改成淡藍灰才看得出樓層 */
+  --m-slab:#d8e7f7;      /* 樓板：白底上不能再用白，改淡藍灰才看得出樓層 */
   --m-shade:#7f9dbd;
-  --m-wall:#a9c8e6;      /* 半透明玻璃牆 */
-  --m-edge:#0b5cb8;      /* 結構框線：要深，白底上才看得見 */
+  --m-wall:#a9c8e6;
+  --m-edge:#0b5cb8;      /* 結構框線要深，白底上才看得見 */
   --m-grid:#3f97e8;
   --m-grid-2:#9dc0e0;
 }
 
-/* ---------- 綠色主題（通關）---------- */
-:root[data-theme="green"]{
-  --bg-0:#fbfffd;
-  --bg-1:#e9f9f1;
-  --bg-2:#dcf5e8;
-
-  --brand:#1fae6c;
-  --brand-hi:#067a45;
-  --brand-line:rgba(6,122,69,.28);
-  --brand-soft:rgba(31,174,108,.16);
-
-  --glow-1:rgba(120,205,165,.30);
-  --glow-2:rgba(85,175,135,.20);
-
-  --ink:#0a3f28;
-  --ink-2:rgba(12,74,48,.72);
-  --ink-3:rgba(20,86,58,.50);
-
-  --m-fog:#f2fdf7;
-  --m-floor:#e2f5ea;
-  --m-slab:#d5f0e2;
-  --m-shade:#6fa189;
-  --m-wall:#a9dcc2;
-  --m-edge:#067a45;
-  --m-grid:#1fae6c;
-  --m-grid-2:#98c9b0;
+:root[data-skin="light"][data-theme="green"]{
+  --bg-0:#fbfffd;  --bg-1:#e9f9f1;  --bg-2:#dcf5e8;
+  --brand:#1fae6c; --brand-hi:#067a45;
+  --brand-line:rgba(6,122,69,.28);  --brand-soft:rgba(31,174,108,.16);
+  --glow-1:rgba(120,205,165,.30);   --glow-2:rgba(85,175,135,.20);
+  --ink:#0a3f28;   --ink-2:rgba(12,74,48,.72);  --ink-3:rgba(20,86,58,.50);
+  --m-fog:#f2fdf7; --m-floor:#e2f5ea; --m-slab:#d5f0e2; --m-shade:#6fa189;
+  --m-wall:#a9dcc2; --m-edge:#067a45; --m-grid:#1fae6c; --m-grid-2:#98c9b0;
 }
 
-/* ---------- 紅色主題 ----------
-   首頁「展示／切換逃生動線」跑動線的那幾秒會切到這一組（js/main.js 的 playRouteDemo），
-   抵達出口就換成綠色。⚠️ 這一組**也要做成淺色**，不然按下按鈕整個介面會從白跳成深紅。 */
-:root[data-theme="red"]{
-  --bg-0:#fffbfa;
-  --bg-1:#ffeeec;
-  --bg-2:#ffe2df;
-
-  --brand:#e8564a;
-  --brand-hi:#c21c0d;
-  --brand-line:rgba(194,28,13,.28);
-  --brand-soft:rgba(232,86,74,.16);
-
-  --glow-1:rgba(235,150,140,.30);
-  --glow-2:rgba(215,110,100,.20);
-
-  --ink:#6b1a12;
-  --ink-2:rgba(120,32,22,.72);
-  --ink-3:rgba(130,45,35,.50);
-
-  --m-fog:#fff5f4;
-  --m-floor:#f8e6e4;
-  --m-slab:#f7dcd7;
-  --m-shade:#b07a72;
-  --m-wall:#eab5ae;
-  --m-edge:#c21c0d;
-  --m-grid:#e8564a;
-  --m-grid-2:#d99a92;
+/* 跑動線那幾秒用的紅色。⚠️ 這一組也要做淺色，不然按下按鈕會從白跳成深紅。 */
+:root[data-skin="light"][data-theme="red"]{
+  --bg-0:#fffbfa;  --bg-1:#ffeeec;  --bg-2:#ffe2df;
+  --brand:#e8564a; --brand-hi:#c21c0d;
+  --brand-line:rgba(194,28,13,.28); --brand-soft:rgba(232,86,74,.16);
+  --glow-1:rgba(235,150,140,.30);   --glow-2:rgba(215,110,100,.20);
+  --ink:#6b1a12;   --ink-2:rgba(120,32,22,.72); --ink-3:rgba(130,45,35,.50);
+  --m-fog:#fff5f4; --m-floor:#f8e6e4; --m-slab:#f7dcd7; --m-shade:#b07a72;
+  --m-wall:#eab5ae; --m-edge:#c21c0d; --m-grid:#e8564a; --m-grid-2:#d99a92;
 }
 
-/* ---------- 語意色（不隨主題變動） ----------
-   ⚠️ 這三支在白色分支上**調深了**。深色版的 --exit:#3dffa0（亮薄荷綠）和
-      --amber:#ffb42e 在白底上幾乎看不見 —— 色相保留（還是綠／黃／紅），只降明度。
-      「不隨主題變」指的是不跟著藍/紅/綠情境換，不是不能為了白底重新定亮度。 */
-:root{
-  --amber:#b87400;     /* 警語 */
-  --red:#d81f10;       /* 起火點 */
-  --exit:#00994f;      /* 安全出口：沿用國際通用的綠色 */
-  --ease:cubic-bezier(.22,.61,.36,1);
+/* 語意色和深/淺鉤子（不分情境色，所以不用配 data-theme）。
+   ⚠️ 語意色**調深了**：深色版的 --exit:#3dffa0（亮薄荷綠）和 --amber:#ffb42e
+      在白底上幾乎看不見。色相保留（還是綠／黃／紅），只降明度。
+      「不隨主題變」是指不跟著 blue/red/green 換，不是不能為白底重定亮度。 */
+:root[data-skin="light"]{
+  --amber:#b87400;
+  --red:#d81f10;
+  --exit:#00994f;
+  --stage-1:#b87400;
+  --stage-2:#d81f10;
 
-  /* 三個時段的代表色，倒數圓盤和右側階段卡共用同一組 */
-  --stage-0:var(--brand-hi);   /* 0-10 秒（剩 30-21）：藍，跟著主色走 */
-  --stage-1:#b87400;           /* 10-20 秒（剩 20-11）：黃 */
-  --stage-2:#d81f10;           /* 20-30 秒（剩 10-0）：紅 */
+  /* ⚠️ multiply 在白底上會把線色**完整**顯示出來（深色底才會被吃掉），所以要調淡、改藍調 */
+  --grain-line:rgba(11,92,184,.07);
+  --grain-op:.35;
+  --ico-bg:rgba(11,92,184,.06);
+  --ico-mix:#fff;
+  /* ⚠️ 白色是 screen 的單位元 —— 白底上那層雜訊會整層消失，要改成往暗壓的 multiply */
+  --noise-blend:multiply;
+  --veil:#fff;           /* 切狀態時是「白閃」不是「黑閃」 */
 }
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 /* =========================================================
@@ -263,10 +352,8 @@ svg{display:block}
 /* 細微掃描線 */
 .grain{
   position:absolute;inset:0;pointer-events:none;z-index:5;
-  /* ⚠️ 白色分支：multiply 在白底上會把線的顏色**完整**顯示出來（深色底才會被吃掉），
-     所以濃度要往下調、顏色改成藍調，不然會變成一條一條明顯的灰線。 */
-  background:repeating-linear-gradient(0deg,rgba(11,92,184,.07) 0 1px,transparent 1px 3px);
-  mix-blend-mode:multiply;opacity:.35;
+  background:repeating-linear-gradient(0deg,var(--grain-line) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:var(--grain-op);
 }
 
 /* ---------- 主格線 ---------- */
@@ -514,7 +601,7 @@ svg{display:block}
   flex:none;width:3.2rem;height:3.2rem;border-radius:50%;
   display:grid;place-items:center;
   border:1px solid color-mix(in srgb, var(--brand) 34%, transparent);
-  background:rgba(11,92,184,.06);        /* 白色分支：原本是 rgba(0,0,0,.35) 的深色圓底 */
+  background:var(--ico-bg);
   color:var(--brand);
   transition:color .3s, border-color .3s, box-shadow .3s, background .3s;
 }
@@ -549,7 +636,7 @@ svg{display:block}
 .phase.is-on .phase__ico{
   color:var(--hot);
   border-color:var(--hot);
-  background:color-mix(in srgb, var(--hot) 14%, #fff);   /* 白色分支：原本混 rgba(0,0,0,.4) */
+  background:color-mix(in srgb, var(--hot) 14%, var(--ico-mix));
   box-shadow:0 0 .9rem color-mix(in srgb, var(--hot) 45%, transparent),
              inset 0 0 .7rem color-mix(in srgb, var(--hot) 20%, transparent);
 }
@@ -1094,9 +1181,7 @@ svg{display:block}
   position:absolute;inset:0;z-index:2;pointer-events:none;
   opacity:0;
   clip-path:var(--shape);
-  /* ⚠️ 白色分支：改成 multiply。screen 只會提亮，白底上等於什麼都沒發生（白是 screen 的單位元），
-     雜訊會整層消失。multiply 是往暗的方向壓，白底上才看得到抽動。 */
-  mix-blend-mode:multiply;
+  mix-blend-mode:var(--noise-blend);
   background:
     repeating-linear-gradient(0deg,
       transparent 0px, transparent 1px,
@@ -1469,8 +1554,7 @@ svg{display:block}
    ========================================================= */
 .blackout{
   position:absolute;inset:0;z-index:2;      /* 只蓋住 3D（canvas 沒有 z-index），舞台標籤 z-index:3 還看得到 */
-  /* ⚠️ 白色分支：遮幕要用 --bg-0（白），不是 #000 —— 不然切狀態時整個 3D 會黑閃一下 */
-  background:var(--bg-0);opacity:0;pointer-events:none;
+  background:var(--veil);opacity:0;pointer-events:none;
   transition:opacity .22s var(--ease);
 }
 .blackout.is-on{opacity:1}

@@ -398,6 +398,8 @@ addEventListener('keydown', (e) => {
                                       break;
     case 'KeyR':                      if (current === 'first') countdown.reset(); break;
     case 'KeyE':                      editors[current]?.toggle(); break;
+    // S = 深色／淺色切換。記在 localStorage，下次開啟沿用；?skin=light 也可以直接指定
+    case 'KeyS':                      toggleSkin(); break;
     default: return;
   }
   e.preventDefault();
@@ -778,6 +780,29 @@ function setTheme(name) {
 }
 let baseTheme = setTheme(params.get('theme') ?? localStorage.getItem('theme') ?? 'blue');
 
+/* =========================================================
+   深色 / 淺色（按 S 切換）
+   ---------------------------------------------------------
+   data-skin="light" ＝淺色，沒有這個屬性＝深色。這是**跟 data-theme 垂直的另一個維度**，
+   所以 blue / red / green 三個情境色照舊運作，只是各自換成淺色的那一套值
+   （色票在 css/style.css 的 :root[data-skin="light"]…）。
+
+   ⚠️ 換完**一定要叫 viewer.applyTheme()** —— 3D 的顏色是「讀 CSS 變數之後存進
+      three.js 材質」的，只改 html 的屬性 3D 不會自己跟著變（跟 setTheme 同一個道理）。
+   ⚠️ 深色是「**沒有**這個屬性」而不是 data-skin="dark" —— 這樣 CSS 那邊的深色值就是
+      單純的 :root，淺色純粹是覆蓋上去的，main 的外觀不會被這個功能動到。
+   ========================================================= */
+function setSkin(name) {
+  const next = name === 'light' ? 'light' : 'dark';
+  if (next === 'light') document.documentElement.dataset.skin = 'light';
+  else delete document.documentElement.dataset.skin;
+  localStorage.setItem('skin', next);
+  viewer.applyTheme();
+  return next;
+}
+let skin = setSkin(params.get('skin') ?? localStorage.getItem('skin') ?? 'dark');
+function toggleSkin() { skin = setSkin(skin === 'light' ? 'dark' : 'light'); }
+
 /* 啟動：**歡迎頁一律是前言頁**（沒帶 ?page= 就進 intro），停 INTRO_HOLD 秒後自動進黃金30秒。
    ?page= 仍然可以指定進入哪一頁（截圖／測試用），但**只在開這一次有效** ——
    套用完就把它從網址上拿掉，所以重新整理、或把網址傳給別人打開，都會回到前言頁，
@@ -826,4 +851,6 @@ Object.assign(window, {
   __editors: editors,
   __editor: editors.first,
   __setTheme: (n) => { localStorage.setItem('theme', n); baseTheme = n; return setTheme(n); },
+  __setSkin: (n) => setSkin(n),          // 'light' / 'dark'（等同按 S）
+  __toggleSkin: () => { toggleSkin(); return skin; },
 });
