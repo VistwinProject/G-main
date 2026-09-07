@@ -3,6 +3,9 @@ import { createCountdown } from './countdown.js';
 import { createEditor } from './editor.js';
 import { createSync } from './sync.js';
 import { createGuideStore } from './guides.js';
+import { createGame } from './game.js';
+import { GameScene } from './game-scene.js';
+let challenge = null;
 
 /* =========================================================
    頁面路由
@@ -76,6 +79,7 @@ let padCmdReady = false;
 const sync = createSync({
   role: 'display',
   onState: (s) => {
+    if (challenge?.isActive()) return; // 本機挑戰不被另一個展示分頁／Pad 的狀態打斷。
     /* ⚠️ 一定要包 try/catch。這個 callback 是從 WebSocket 的 onmessage 裡叫的，
        而 goto() 會碰到 current / pageEls / countdown / viewer 一整串模組層級的東西。
        模組初始化如果中途失敗（例如這台開不了 WebGL，new Viewer() 直接拋），
@@ -327,8 +331,13 @@ let current = null;
 
 function goto(id) {
   if (!pageEls.has(id) || id === current) return;
+  challenge?.onPage(id);
   current = id;
   for (const [key, el] of pageEls) el.classList.toggle('is-active', key === id);
+  document.querySelectorAll('[data-go-page]').forEach((button) => {
+    if (button.dataset.goPage === id) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
 
   closeEditors(id);                // 換頁就關掉其他頁的編輯模式
   if (id !== 'home') { resetRouteDemo(); stopIdleFx(); }    // 離開首頁：收掉動線、關掉通關訊息、主色回原本的
@@ -375,8 +384,21 @@ function goto(id) {
   }
 }
 
+// 按鈕切頁採手動展示模式，停留在選取頁面，方便講解。
+document.querySelectorAll('[data-go-page]').forEach((button) => {
+  button.addEventListener('click', () => {
+    welcomeDone = true;
+    introDone = true;
+    goto(button.dataset.goPage);
+  });
+});
+
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  if (challenge?.isActive()) return; // 挑戰中由題目按鈕操作，避免展示快捷鍵打斷回放。
+
+  // 保留按鈕原生 Enter 啟動行為，避免鍵盤操作導覽時被強制送到首頁。
+  if (e.target instanceof HTMLButtonElement && (e.code === 'Enter' || e.code === 'NumpadEnter')) return;
 
   // 正在輸入欄位裡打字時不要切頁（工具列有數字輸入框），Esc 只負責離開欄位
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -612,7 +634,7 @@ function stopIdleFx() {
 }
 
 /** repeat=true（展示）：重複「目前這一條」；repeat=false（切換）：隨機挑別條、避開目前這一條 */
-function playRouteDemo(repeat) {
+function playRouteDemo(repeat, forcedIndex = null, completed = null) {
   // 模型還沒載完就還沒有動線資料，直接不理會（別讓介面先變紅又變回來）
   if (!viewer.routeCount('tower')) {
     console.warn('[route] 首頁的逃生動線還沒載入完，稍等一下再按');
@@ -634,7 +656,7 @@ function playRouteDemo(repeat) {
     let runDur = 0;                           // 這一條實際跑幾秒，下面要一起送給 Pad
     lastRoute = viewer.playRoute('tower', {
       duration: (i, len) => (runDur = routeSeconds(len)),  // 點等速：秒數只看路徑長度
-      index: (repeat && cur >= 0) ? cur : null, // 展示＝重複目前這一條；切換＝交給下面隨機挑
+      index: forcedIndex ?? ((repeat && cur >= 0) ? cur : null),
       avoidCurrent: !repeat,                    // 切換時避開上一次播的那一條
       avoid: repeat ? -1 : cur,                 // 切換時也避開「目前這一條」（待機正在冒煙的那條）
       shot: (i) => `route${i + 1}`,           // 這條動線的運鏡（編輯模式的時間軸上設的）
@@ -658,6 +680,7 @@ function playRouteDemo(repeat) {
             pushSync();                       // Pad 跟著切成「已抵達出口」
             showClear(true);                  // 恭喜通關
             startGreenFx();                   // 換「切換逃生動線」抽，同樣的節奏、綠色
+            completed?.();
           });
         }, EXIT_HOLD);
       },
@@ -804,6 +827,8 @@ function setSkin(name) {
   localStorage.setItem('skin', next);
   // 圖示本身是 CSS 換的，這裡只把說明文字對上「按下去會變成什麼」
   skinBtn?.setAttribute('aria-label', next === 'light' ? '切換到深色' : '切換到淺色');
+  const skinLabel = skinBtn?.querySelector('.skin-toggle__label');
+  if (skinLabel) skinLabel.textContent = next === 'light' ? '深色版' : '淺色版';
   viewer.applyTheme();
   return next;
 }
@@ -849,6 +874,37 @@ document.fonts.ready.then(() => new Promise((r) => setTimeout(r, 60))).then(asyn
     clearTimeout(bootFallback);
     booted();
   }
+});
+
+const gameScene = new GameScene(viewer);
+challenge = createGame({
+  enter() { welcomeDone = true; introDone = true; goto('home'); },
+  stop() {
+    gameScene.stop();
+    clearTimeout(fadeTimer);
+    blackoutEl?.classList.remove('is-on');
+    resetRouteDemo();
+    viewer.setAllWhite(false);
+    setTheme(baseTheme);
+    if (current === 'home') { startIdleFx(); showIdleFire(); }
+  },
+  ready: () => viewer.routeCount('tower') > 3,
+  configure: (level) => gameScene.configure(level),
+  scene: (phase) => {
+    stopIdleFx();
+    setTheme(phase === 'intro' ? 'blue' : 'red');
+    viewer.setAllWhite(false);
+    gameScene.stage(phase);
+  },
+  play(done) {
+    stopIdleFx();
+    setTheme('red');
+    gameScene.play(() => {
+      setTheme('green');
+      viewer.setAllWhite(true);
+      done();
+    });
+  },
 });
 
 /* 方便在 console 直接操作：__viewer.loadModel('./models/x.glb') */

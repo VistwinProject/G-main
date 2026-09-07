@@ -176,12 +176,12 @@
 
   --m-fog:#f4f8fe;       /* 霧＝底色，遠處才融進背景 */
   --m-floor:#e6eef8;
-  --m-slab:#d8e7f7;      /* 樓板：白底上不能再用白，改淡藍灰才看得出樓層 */
-  --m-shade:#7f9dbd;
-  --m-wall:#a9c8e6;
-  --m-edge:#0b5cb8;      /* 結構框線要深，白底上才看得見 */
-  --m-grid:#3f97e8;
-  --m-grid-2:#9dc0e0;
+  --m-slab:#e2e7eb;      /* 淺色模型採低彩度藍灰，保留樓層與結構對比 */
+  --m-shade:#929fa9;
+  --m-wall:#c2ccd4;
+  --m-edge:#526c80;
+  --m-grid:#8b9eac;
+  --m-grid-2:#b9c5cd;
 }
 
 :root[data-skin="light"][data-theme="green"]{
@@ -190,8 +190,8 @@
   --brand-line:rgba(6,122,69,.28);  --brand-soft:rgba(31,174,108,.16);
   --glow-1:rgba(120,205,165,.30);   --glow-2:rgba(85,175,135,.20);
   --ink:#0a3f28;   --ink-2:rgba(12,74,48,.72);  --ink-3:rgba(20,86,58,.50);
-  --m-fog:#f2fdf7; --m-floor:#e2f5ea; --m-slab:#d5f0e2; --m-shade:#6fa189;
-  --m-wall:#a9dcc2; --m-edge:#067a45; --m-grid:#1fae6c; --m-grid-2:#98c9b0;
+  --m-fog:#f2fdf7; --m-floor:#e2f5ea; --m-slab:#e1e8e4; --m-shade:#94a29b;
+  --m-wall:#c3d0c9; --m-edge:#587566; --m-grid:#8ea69a; --m-grid-2:#becdc5;
 }
 
 /* 跑動線那幾秒用的紅色。⚠️ 這一組也要做淺色，不然按下按鈕會從白跳成深紅。 */
@@ -201,8 +201,8 @@
   --brand-line:rgba(194,28,13,.28); --brand-soft:rgba(232,86,74,.16);
   --glow-1:rgba(235,150,140,.30);   --glow-2:rgba(215,110,100,.20);
   --ink:#6b1a12;   --ink-2:rgba(120,32,22,.72); --ink-3:rgba(130,45,35,.50);
-  --m-fog:#fff5f4; --m-floor:#f8e6e4; --m-slab:#f7dcd7; --m-shade:#b07a72;
-  --m-wall:#eab5ae; --m-edge:#c21c0d; --m-grid:#e8564a; --m-grid-2:#d99a92;
+  --m-fog:#fff5f4; --m-floor:#f8e6e4; --m-slab:#eae3e1; --m-shade:#aa9692;
+  --m-wall:#d5c7c4; --m-edge:#89625c; --m-grid:#b49b95; --m-grid-2:#d2c1bc;
 }
 
 /* 語意色和深/淺鉤子（不分情境色，所以不用配 data-theme）。
@@ -307,7 +307,8 @@ html{
      ⚠️ 這個數字**不能亂改** —— 它就是版面存檔的座標系。改了所有 layout*.json 都要重調。
      ⚠️ 以前這裡是 .8333vw（= 畫布 120rem 寬），比存檔實際用到的 138.8rem 窄了 18.8rem，
         所以在 16:9 開的時候右邊那一欄會被裁掉約 261px。 */
-  font-size:max(8px, min(calc(100vw / var(--canvas-w)), 1.4814vh));
+  /* 不設最小 rem：窄預覽也必須讓整張固定畫布等比縮入視窗。 */
+  font-size:min(calc(100vw / var(--canvas-w)), 1.4814vh);
   /* 全螢幕看板：不能出現捲軸，否則捲軸會改變 vw/vh 進而改變 rem */
   overflow:hidden;
 }
@@ -347,25 +348,21 @@ svg{display:block}
 /* 只放 <defs>（濾鏡之類）的 svg，不佔版面 */
 .svg-defs{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
 
-/* ---------- 深色／淺色切換（左上角） ----------
+/* ---------- 深色／淺色切換（左下導覽列） ----------
    ⚠️ z-index 要壓過頁面裡的東西。.page 自己沒有 z-index，所以它的子元素是跟這顆
       **在同一個堆疊環境裡**比大小的：.grain 和 .home__clear 是 5、.home__brand 是 6，
       所以這裡給 20。編輯模式的覆蓋層是 30，會蓋在它上面（刻意的，編排時不要誤觸）。
    ⚠️ 位置用 rem，所以跟著畫布等比縮放，不會在大螢幕上變成一顆小點。 */
 .skin-toggle{
-  position:absolute;right:1.2rem;top:1.2rem;z-index:20;
-  width:2.5rem;height:2.5rem;padding:.5rem;
-  display:grid;place-items:center;
-  border:1px solid var(--brand-line);border-radius:50%;
   background:none;color:var(--brand-hi);
-  cursor:pointer;opacity:.5;
+  cursor:pointer;
   transition:opacity .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease);
 }
 .skin-toggle:hover{opacity:1;border-color:color-mix(in srgb, var(--brand) 55%, transparent)}
 .skin-toggle:focus-visible{outline:2px solid var(--brand-hi);outline-offset:2px}
 .skin-toggle:active{translate:0 1px}
 .skin-toggle svg{
-  width:100%;height:100%;fill:none;stroke:currentColor;
+  width:1.5rem;height:1.5rem;flex:none;fill:none;stroke:currentColor;
   stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;
 }
 /* 顯示「按下去會變成什麼」：深色 → 太陽，淺色 → 月亮 */
@@ -377,6 +374,25 @@ svg{display:block}
 /* 設計畫布本體。⚠️ 不要改回 100vw/100vh —— 那樣畫布會跟著視窗的比例變形，
    存好的版面換一個比例開就會跑掉（右邊那一欄掉出畫面就是這樣來的）。 */
 .app{position:relative;width:calc(var(--canvas-w) * 1rem);height:67.5rem;overflow:hidden}
+.page-nav{
+  position:absolute;left:3rem;bottom:2rem;z-index:20;
+  display:flex;gap:.65rem;padding:.6rem;
+  border:1px solid var(--brand-line);border-radius:.5rem;
+  background:var(--bg-0);
+}
+.page-nav button{
+  display:flex;align-items:center;gap:.65rem;min-height:44px;
+  padding:.85rem 1.15rem;border:1px solid transparent;border-radius:.25rem;
+  background:transparent;color:var(--ink-2);font:inherit;font-size:1.25rem;
+  white-space:nowrap;cursor:pointer;
+}
+.page-nav button span{font-size:.85em;opacity:.65}
+.page-nav .skin-toggle{border-left-color:var(--brand-line)}
+.page-nav .skin-toggle__label{font-size:inherit;opacity:1}
+.page-nav button:hover,.page-nav button[aria-current="page"]{
+  color:var(--brand-hi);background:var(--brand-soft);border-color:var(--brand-line);
+}
+.page-nav button:focus-visible{outline:2px solid var(--brand-hi);outline-offset:2px}
 
 .page{
   position:absolute;inset:0;
@@ -1601,18 +1617,7 @@ svg{display:block}
   overflow:hidden;clip-path:inset(50%);white-space:nowrap;
 }
 
-/* =========================================================
-   窄螢幕 / 直式 — 保持不橫向捲動
-   ========================================================= */
-@media (max-aspect-ratio: 5/4){
-  .layout{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
-  .col-side{flex-direction:row;align-items:stretch;gap:.9rem}
-  .side-head{text-align:left;flex:none;align-self:center;max-width:11rem}
-  .phases{flex-direction:row;flex:1}
-  .phase{flex:1}
-  .mid{grid-template-columns:1fr}
-  .stage{display:none}
-}
+/* 窄螢幕沿用固定畫布，由根字級等比縮放；不重排或隱藏 3D。 */
 
 /* =========================================================
    狀態切換的黑幕

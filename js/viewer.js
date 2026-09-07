@@ -2408,6 +2408,7 @@ export class Viewer {
       if (this._motionPaused || this._hold || this._fly) this.controls.autoRotate = false;
       this.controls.update();
       this.controls.autoRotate = spin;
+      this.onGameFrame?.(t);
       this.renderer.render(this.scene, this.camera);
     };
     loop();
