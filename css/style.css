@@ -1035,6 +1035,28 @@ svg{display:block}
   background:url(../assets/anlb-neon.png) center / contain no-repeat;
 }
 
+/* ---------- 淺色版的 ANLB 字標：實心 + 藍色 ----------
+   深色版是 anlb-neon.png（光暈已經烘在圖裡，只在深底上成立，放到白底會變成一團灰霧）。
+   淺色版換成實心的 anlb.png，並且**染成主色藍**。
+
+   做法：anlb.png 是 RGBA、底是透明的，所以直接拿它的 alpha 當遮罩、底下填 var(--brand-hi)。
+   這樣顏色就是**精準的色票值**，換主題色字標會跟著變，不用另外準備藍色版的圖。
+   ⚠️ 不要用 background-blend-mode 那種混合法 —— 圖是透明底，screen/multiply 混出來的是
+      「藍底＋淺色字」，剛好反過來。走遮罩才對。
+   ⚠️ mask 要連 -webkit- 前綴一起寫。
+
+   ⚠️ anlb.png 的透明留白很寬（3508×2481，字標只佔寬度的 ~82%；深色版那張是 ~90.7%），
+      直接 contain 會小一截。所以放大 --logo-k 倍、讓框把留白裁掉，大小才跟深色版一致。
+      **覺得大小不對就只改 --logo-k 這一個數字**（框的寬高比不要動，兩個 skin 共用同一個框，
+      而且它是編輯模式的 introLogo 物件，改了會跟存檔對不起來）。 */
+[data-skin="light"] .intro__logo{
+  --logo-k:1.88;
+  background:var(--brand-hi);
+  -webkit-mask:url(../assets/anlb.png) center / auto calc(var(--logo-k) * 100%) no-repeat;
+          mask:url(../assets/anlb.png) center / auto calc(var(--logo-k) * 100%) no-repeat;
+  opacity:.85;
+}
+
 /* ---------- 3D 區 ---------- */
 .home__stage{grid-area:stage;min-width:0;min-height:0}
 

@@ -716,6 +716,7 @@ node "C:\Users\USER\Desktop\coding\網頁\fire-golden-30s\server.mjs" 5280
 | `B` | 回到**藍色介面**（不在首頁就先進首頁；已經在首頁就把紅／綠的動線示範收掉回到待機） |
 | `R` | 重新倒數（或直接點圓盤） |
 | `E` | 版面編輯模式（見下） |
+| `S` | **深色／淺色切換**（記在 localStorage；也可以 `?skin=light`） |
 
 ## 版面編輯模式
 
