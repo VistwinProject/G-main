@@ -25,6 +25,22 @@
 
 <div id="app" class="app">
 
+  <!-- 深色／淺色切換：**四頁共用一顆**，放在 .app 底下而不是任何 .page 裡面，
+       所以切頁時它不會跟著淡出，也不會被版面編輯器凍結。
+       ⚠️ 刻意**不加 data-obj** —— 加了編輯器就會接手、每頁各存一份位置，
+          而它是全站共用的控制項，固定在角落就好。
+       ⚠️ 圖示顯示的是「按下去會變成什麼」：深色時給太陽、淺色時給月亮。
+          切換是純 CSS（css/style.css 的 .skin-toggle 讀 [data-skin]），JS 只換 aria-label。 -->
+  <button class="skin-toggle" type="button" id="skin-toggle" aria-label="切換到淺色">
+    <svg class="skin-toggle__sun" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/>
+    </svg>
+    <svg class="skin-toggle__moon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.2 14.6A8.5 8.5 0 0 1 9.4 3.8a8.5 8.5 0 1 0 10.8 10.8Z"/>
+    </svg>
+  </button>
+
   <!-- ============================================================
        PAGE 0 — 前言 (I)　開機看到的第一頁，停 INTRO_HOLD 秒後自動進「火災黃金30秒」
        ============================================================ -->

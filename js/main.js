@@ -792,16 +792,24 @@ let baseTheme = setTheme(params.get('theme') ?? localStorage.getItem('theme') ??
    ⚠️ 深色是「**沒有**這個屬性」而不是 data-skin="dark" —— 這樣 CSS 那邊的深色值就是
       單純的 :root，淺色純粹是覆蓋上去的，main 的外觀不會被這個功能動到。
    ========================================================= */
+/* 左上角的太陽／月亮，點一下等於按 S。
+   ⚠️ 這個 const 要宣告在 setSkin **前面** —— setSkin 在模組載入時就會被呼叫一次
+      （套用存下來的 skin），那時候如果 skinBtn 還在 TDZ 就會丟 ReferenceError。 */
+const skinBtn = document.getElementById('skin-toggle');
+
 function setSkin(name) {
   const next = name === 'light' ? 'light' : 'dark';
   if (next === 'light') document.documentElement.dataset.skin = 'light';
   else delete document.documentElement.dataset.skin;
   localStorage.setItem('skin', next);
+  // 圖示本身是 CSS 換的，這裡只把說明文字對上「按下去會變成什麼」
+  skinBtn?.setAttribute('aria-label', next === 'light' ? '切換到深色' : '切換到淺色');
   viewer.applyTheme();
   return next;
 }
 let skin = setSkin(params.get('skin') ?? localStorage.getItem('skin') ?? 'dark');
 function toggleSkin() { skin = setSkin(skin === 'light' ? 'dark' : 'light'); }
+skinBtn?.addEventListener('click', toggleSkin);
 
 /* 啟動：**歡迎頁一律是前言頁**（沒帶 ?page= 就進 intro），停 INTRO_HOLD 秒後自動進黃金30秒。
    ?page= 仍然可以指定進入哪一頁（截圖／測試用），但**只在開這一次有效** ——
