@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export const disasters = [
   {name:'火災',topics:[
-    ['防火區劃',['doors','walls','slabs'],'門、牆與樓板共同形成阻隔，限制火與煙向其他空間蔓延。防火門必須能正常關閉，牆面與管線穿越處也需要完整的防火處理。','不要楔住防火門，也不要堆放物品妨礙關閉。'],
+    ['防火區劃',['doors','walls'],'門、牆與樓板共同形成阻隔，限制火與煙向其他空間蔓延。防火門必須能正常關閉，牆面與管線穿越處也需要完整的防火處理。','不要楔住防火門，也不要堆放物品妨礙關閉。'],
     ['安全梯與阻煙',['doors','core'],'樓梯周邊的區劃與門扇有助維持避難空間；防火不等於完全遮煙，實際性能取決於整體設計與維護。','平時熟悉出口；火災時依現場狀況及消防指示行動，不進入充滿濃煙的通道。'],
     ['偵測與初期應變',[],'警報、探測器、撒水與排煙設備各有不同作用，需要整體連動與定期檢查。本模型不以牆板代替消防設備。','發現火煙先示警並通報；勿為取物返回危險區域。']
   ]},
@@ -53,8 +53,45 @@ export function createInformation(viewer){
   panel.innerHTML='<header><h2></h2><button type="button" aria-label="關閉科普解說">關閉</button></header><div class="information-topics"></div><h3></h3><p class="information-description"></p><p class="information-action"></p><p class="information-status" role="status"></p><p class="information-note">教學示意｜紅色代表選取的構件，不代表損壞或警報。構件用途與災害關聯包含推測，非本棟性能認證或即時避難指引。</p>';
   page.append(nav,panel);
   const root=new THREE.Group();root.name='information-components';viewer.modelRoot.add(root);
+  let cameraLimits=null;
+  const overview=document.createElement('button');overview.type='button';overview.textContent='回到全景';overview.className='information-overview';panel.querySelector('header').after(overview);
+  function restoreLimits(){if(cameraLimits){viewer.controls.minDistance=cameraLimits.min;viewer.controls.maxDistance=cameraLimits.max;cameraLimits=null;}}
+  overview.onclick=()=>{restoreLimits();viewer.releaseShot(1.2);};
+  // Cancel topic motion when the visitor starts dragging; keep OrbitControls available.
+  viewer.controls.addEventListener('start',()=>{if(page.classList.contains('is-active')){viewer._fly=null;viewer.controls.autoRotate=false;viewer.swing.on=false;}});
+  function boxes(group){if(!group)return [];group.updateWorldMatrix(true,true);return group.children.filter(x=>x.isMesh).map(mesh=>new THREE.Box3().setFromObject(mesh)).filter(box=>!box.isEmpty());}
+  function focusTopic(topic,groups){
+    if(!page.classList.contains('is-active'))return;
+    if(!groups.length){overview.click();return;}
+    root.updateWorldMatrix(true,true);
+    const full=new THREE.Box3().setFromObject(root),center=full.getCenter(new THREE.Vector3());let target=center.clone(),size=full.getSize(new THREE.Vector3()),direction=new THREE.Vector3(1,.7,1),detail=false;
+    const mapped=Object.fromEntries(topic[1].map((key,i)=>[key,groups[i]]));
+    if(topic[0]==='防火區劃'||topic[0].includes('積水')||topic[0].includes('排水')){
+      direction.set(.015,1,.045);
+    }else if(topic[0]==='梁柱抗震'){
+      const joints=[];
+      for(const beam of boxes(mapped.beams))for(const column of boxes(mapped.columns)){
+        const hit=beam.clone().expandByScalar(.12).intersect(column);
+        if(!hit.isEmpty())joints.push(hit.getCenter(new THREE.Vector3()));
+      }
+      joints.sort((a,b)=>b.y-a.y||a.distanceToSquared(center)-b.distanceToSquared(center));
+      if(joints.length){target=joints[0];size.set(6,5,6);detail=true;direction.set(1,.65,1);}
+    }else if(topic[1].includes('glass')||topic[1].includes('frames')){
+      const candidates=boxes(mapped.glass??mapped.frames).filter(box=>{const s=box.getSize(new THREE.Vector3());return Math.max(s.x,s.y,s.z)<8&&Math.max(s.x,s.y,s.z)>.3;});
+      candidates.sort((a,b)=>a.getCenter(new THREE.Vector3()).distanceToSquared(viewer.camera.position)-b.getCenter(new THREE.Vector3()).distanceToSquared(viewer.camera.position));
+      if(candidates.length){const chosen=candidates[0];target=chosen.getCenter(new THREE.Vector3());size=chosen.getSize(new THREE.Vector3()).multiplyScalar(2.5);detail=true;direction.copy(target).sub(center);direction.y=.6;if(direction.length()<.1)direction.set(1,.3,1);}
+    }else if(topic[0]==='安全梯與阻煙'){
+      const doors=boxes(mapped.doors);if(doors.length){const selected=doors.sort((a,b)=>b.max.y-a.max.y)[0];target=selected.getCenter(new THREE.Vector3());size.set(9,9,9);detail=true;direction.set(1,1.1,1);}
+    }
+    cameraLimits??={min:viewer.controls.minDistance,max:viewer.controls.maxDistance};viewer.controls.minDistance=2;viewer.controls.maxDistance=Math.max(cameraLimits.max,180);
+    const fov=THREE.MathUtils.degToRad(viewer.camera.fov),extent=detail?Math.max(size.x,size.y,size.z):Math.max(size.x,size.z,size.y);
+    const distance=Math.max(5,extent/(2*Math.tan(fov/2))*1.3);
+    const position=target.clone().add(direction.normalize().multiplyScalar(distance));
+    viewer._override=true;viewer._hold=true;viewer.controls.autoRotate=false;viewer.swing.on=false;
+    viewer._flyTo({pos:position.toArray(),target:target.toArray()},matchMedia('(prefers-reduced-motion: reduce)').matches?.01:1.5);
+  }
   // Match the original tower coordinates; no independent normalization or camera changes.
-  const visibility=new MutationObserver(()=>{root.visible=page.classList.contains('is-active')&&!panel.hidden;});
+  const visibility=new MutationObserver(()=>{root.visible=page.classList.contains('is-active')&&!panel.hidden;if(!page.classList.contains('is-active')){++ticket;restoreLimits();}});
   visibility.observe(page,{attributes:true,attributeFilter:['class']});
   const cache=new Map();let ticket=0;
   async function component(key){
@@ -71,12 +108,12 @@ export function createInformation(viewer){
     panel.querySelector('h3').textContent=topic[0];panel.querySelector('.information-description').textContent=topic[2];panel.querySelector('.information-action').textContent=`居民可以做：${topic[3]}`;
     const status=panel.querySelector('.information-status');const id=++ticket;root.clear();root.visible=true;
     status.textContent=topic[1].length?'正在載入相關構件…':'此主題以文字說明，不以其他構件代替設備。';
-    try{const groups=await Promise.all(topic[1].map(component));if(id!==ticket)return;groups.forEach(g=>root.add(g));status.textContent=groups.length?'紅色構件：'+topic[0]:status.textContent;}
+    try{const groups=await Promise.all(topic[1].map(component));if(id!==ticket)return;groups.forEach(g=>root.add(g));focusTopic(topic,groups);status.textContent=groups.length?'紅色構件：'+topic[0]+' · 可拖曳調整視角':status.textContent;}
     catch{if(id===ticket)status.textContent='構件載入未完成，請重新選取主題。';}
   }
   disasters.forEach(disaster=>{const button=document.createElement('button');button.type='button';button.textContent=disaster.name;button.setAttribute('aria-pressed','false');nav.append(button);button.addEventListener('click',()=>{
     panel.hidden=false;page.classList.add('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));panel.querySelector('h2').textContent=disaster.name+' · 建築防護';
     const topics=panel.querySelector('.information-topics');topics.replaceChildren();disaster.topics.forEach(topic=>{const b=document.createElement('button');b.type='button';b.textContent=topic[0];b.setAttribute('aria-pressed','false');b.onclick=()=>selectTopic(topic,b);topics.append(b);});topics.firstElementChild.click();
   });});
-  panel.querySelector('header button').onclick=()=>{++ticket;root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
+  panel.querySelector('header button').onclick=()=>{++ticket;overview.click();root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
 }
