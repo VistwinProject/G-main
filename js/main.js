@@ -1,4 +1,5 @@
 import { Viewer } from './viewer.js';
+import { createInformation } from './information.js';
 import { createCountdown } from './countdown.js';
 import { createEditor } from './editor.js';
 import { createSync } from './sync.js';
@@ -145,6 +146,7 @@ const outroStage = document.getElementById('stage-outro');
 const introSpark = document.querySelector('.intro__spark');
 const homeStage = document.getElementById('stage-home');
 const viewer = new Viewer();
+createInformation(viewer);
 const countdown = createCountdown({
   ticksEl: document.getElementById('ring-ticks'),
   headEl: document.getElementById('ring-head'),
