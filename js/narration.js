@@ -1,6 +1,6 @@
 export function createNarrationPages(){
   const section=document.createElement('section');section.className='page page--welcome';section.dataset.page='welcome';
-  section.innerHTML='<button class="voice-wave" type="button" aria-label="播放開場語音；播放中按一下暫停"><canvas aria-hidden="true"></canvas></button>';
+  section.innerHTML='<div class="grain" aria-hidden="true"></div><div class="welcome-noise" aria-hidden="true"></div><i class="intro__corner intro__corner--tl" aria-hidden="true"></i><i class="intro__corner intro__corner--tr" aria-hidden="true"></i><i class="intro__corner intro__corner--bl" aria-hidden="true"></i><i class="intro__corner intro__corner--br" aria-hidden="true"></i><button class="voice-wave" type="button" aria-label="播放開場語音；播放中按一下暫停"><canvas aria-hidden="true"></canvas></button><div class="welcome-captions" role="region" aria-label="開場滾動字幕"><div class="welcome-caption-track">危機發生時，掌握狀況，才能判斷下一步。　接下來，你將進入火災逃生模擬。　在這個模擬情境中，我們將展示起火位置、煙霧與空間動線，如何影響逃生路徑的選擇。　請留意畫面中的引導，想像螢幕、平板與燈光彼此連動，如何協助住戶辨識方向、避開危險。　真正的安全，不只是在危機中找到方向，更從日常的預防開始。</div></div>';
   document.getElementById('app').append(section);
 }
 
@@ -40,7 +40,12 @@ export function createNarration({navigate}){
   audio.addEventListener('ended',()=>{sync();if(current==='welcome')navigate('intro');});
   toggle.onclick=()=>{if(closingHold){clearTimeout(closingTimer);closingTimer=null;closingHold=false;audio.playbackRate=.93;toggle.textContent='播放語音';return;}audio.paused?play():audio.pause();};wave.onclick=()=>audio.paused?play():audio.pause();controls.querySelector('.voice-replay').onclick=()=>{resetClosing();audio.currentTime=0;sync();play();};
   function draw(){if(current!=='welcome')return;const rect=canvas.getBoundingClientRect();canvas.width=Math.max(1,Math.round(rect.width*devicePixelRatio));canvas.height=Math.max(1,Math.round(rect.height*devicePixelRatio));const w=canvas.width,h=canvas.height;paint.clearRect(0,0,w,h);const values=new Uint8Array(128);if(analyser)analyser.getByteFrequencyData(values);paint.strokeStyle='#75d8ff';paint.lineWidth=Math.max(2,w/350);paint.lineCap='round';paint.shadowColor='#3bbcff';paint.shadowBlur=18;
-    for(let i=0;i<65;i++){const x=w*(.05+.9*i/64),level=audio.paused?.025:Math.max(.015,values[Math.floor(i*1.5)]/255),height=h*(.025+level*.7)*Math.sin(Math.PI*(i+1)/66);paint.beginPath();paint.moveTo(x,h/2-height/2);paint.lineTo(x,h/2+height/2);paint.stroke();}raf=requestAnimationFrame(draw);
+    paint.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--brand-hi').trim()||'#75d8ff';paint.shadowColor=paint.strokeStyle;
+    for(let i=0;i<65;i++){const x=w*(.05+.9*i/64),level=audio.paused?.025:Math.max(.015,values[Math.floor(i*1.5)]/255),height=h*(.025+level*.7)*Math.sin(Math.PI*(i+1)/66);paint.beginPath();paint.moveTo(x,h/2-height/2);paint.lineTo(x,h/2+height/2);paint.stroke();}
+    const track=document.querySelector('.welcome-caption-track'),box=track.parentElement;
+    const progress=Number.isFinite(audio.duration)&&audio.duration>0?Math.min(1,audio.currentTime/audio.duration):0;
+    track.style.transform=`translateX(${-Math.max(0,track.scrollWidth-box.clientWidth)*progress}px)`;
+    raf=requestAnimationFrame(draw);
   }
   return {enter(id){++request;const ticket=request;audio.pause();resetClosing();cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);current=id;error.textContent='';controls.hidden=!files[id]||id==='welcome';
     if(!files[id]){audio.removeAttribute('src');audio.load();return;}
