@@ -101,6 +101,9 @@ export function createInformation(viewer){
       const p=new THREE.Vector3(x,y,z).sub(target),depth=p.dot(forward);
       distance=Math.max(distance,depth+Math.abs(p.dot(right))/(tanX*.88),depth+Math.abs(p.dot(up))/(tanY*.76));
     }
+    // Whole-building teaching shots should read as a large model, not a thumbnail.
+    // Keep the already-close window/joint shots at their existing distance.
+    if(!detail)distance=Math.max(8,distance*.55);
     const position=target.clone().add(direction.normalize().multiplyScalar(distance));
     viewer._override=true;viewer._hold=true;viewer.controls.autoRotate=false;viewer.swing.on=false;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,activeTicket=ticket;
@@ -123,7 +126,7 @@ export function createInformation(viewer){
     if(!cache.has(key))cache.set(key,new GLTFLoader().loadAsync(`./models/information/component-${key}.gltf`).then(({scene})=>{
       scene.updateMatrixWorld(true);const group=new THREE.Group();
       scene.traverse(source=>{if(!source.isMesh)return;const geometry=source.geometry.clone();geometry.applyMatrix4(source.matrixWorld);
-        const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:key==='doors'?.85:(key==='glass'||key==='frames')?0:.32,depthWrite:false,depthTest:false,side:THREE.DoubleSide}));mesh.renderOrder=90;group.add(mesh);
+        const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:key==='doors'?.85:(key==='glass'||key==='frames')?.4:.32,depthWrite:false,depthTest:false,side:THREE.DoubleSide}));mesh.renderOrder=90;group.add(mesh);
         const lines=new THREE.LineSegments(new THREE.EdgesGeometry(geometry,30),new THREE.LineBasicMaterial({color:0xff4545,transparent:true,opacity:.85,depthTest:false,depthWrite:false}));lines.renderOrder=91;group.add(lines);
       });return group;
     }).catch(error=>{cache.delete(key);throw error;}));return cache.get(key);
