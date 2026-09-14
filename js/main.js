@@ -1,4 +1,5 @@
 import { Viewer } from './viewer.js';
+import { createNarrationPages, createNarration } from './narration.js';
 import { createInformation, createPreventionPage } from './information.js';
 import { createCountdown } from './countdown.js';
 import { createEditor } from './editor.js';
@@ -11,7 +12,8 @@ import { createGuideStore } from './guides.js';
    （原本按 0 / 1 的綠色、紅色空白頁已經拿掉）
    ========================================================= */
 createPreventionPage();
-const PAGES = ['intro', 'first', 'home', 'prevention', 'outro'];
+createNarrationPages();
+const PAGES = ['welcome', 'intro', 'first', 'home', 'prevention', 'outro'];
 
 /* 首頁逃生動線示範的節奏常數（editors 也用得到，所以放最上面） */
 /* 動線的節奏：**動線上的點照路徑長度等速跑**（秒數 = 長度 ÷ ROUTE_SPEED）。
@@ -78,6 +80,8 @@ let padCmdReady = false;
 const sync = createSync({
   role: 'display',
   onState: (s) => {
+    // Do not let a cached Pad scene skip the audio opening before it finishes.
+    try { if (current === 'welcome') return; } catch { return; }
     /* ⚠️ 一定要包 try/catch。這個 callback 是從 WebSocket 的 onmessage 裡叫的，
        而 goto() 會碰到 current / pageEls / countdown / viewer 一整串模組層級的東西。
        模組初始化如果中途失敗（例如這台開不了 WebGL，new Viewer() 直接拋），
@@ -327,10 +331,13 @@ const closeEditors = (except) => {
 
 const params = new URLSearchParams(location.search);
 let current = null;
+const narration = createNarration({navigate: goto});
 
 function goto(id) {
   if (!pageEls.has(id) || id === current) return;
   current = id;
+  narration.enter(id);
+  document.getElementById('app').classList.toggle('showing-welcome', id === 'welcome');
   for (const [key, el] of pageEls) el.classList.toggle('is-active', key === id);
   document.querySelectorAll('[data-go-page]').forEach(button => {
     if (button.dataset.goPage === id) button.setAttribute('aria-current', 'page');
@@ -828,7 +835,7 @@ skinBtn?.addEventListener('click', toggleSkin);
    套用完就把它從網址上拿掉，所以重新整理、或把網址傳給別人打開，都會回到前言頁，
    不會有人卡在某一頁當歡迎頁。 */
 const startPage = params.get('page');
-goto(PAGES.includes(startPage) ? startPage : 'intro');
+goto(PAGES.includes(startPage) ? startPage : 'welcome');
 if (params.has('page')) {
   params.delete('page');                       // 只拿掉 page，其他參數（theme / edit / layout…）留著
   const q = params.toString();
