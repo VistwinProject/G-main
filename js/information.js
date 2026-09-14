@@ -65,7 +65,15 @@ export function createInformation(viewer){
     if(!page.classList.contains('is-active'))return;
     if(!groups.length){overview.click();return;}
     root.updateWorldMatrix(true,true);
-    const full=new THREE.Box3();groups.forEach(group=>full.union(new THREE.Box3().setFromObject(group)));const center=full.getCenter(new THREE.Vector3());let target=center.clone(),size=full.getSize(new THREE.Vector3()),direction=new THREE.Vector3(1,.7,1),detail=false;
+    const full=new THREE.Box3();groups.forEach(group=>{
+      if(group===viewer.customModels.tower){
+        // Hidden route runners/smoke helpers can extend to the origin. They must
+        // not pull the building's framing center below its actual geometry.
+        const materials=Object.values(viewer._blueprintMats??{});
+        group.updateWorldMatrix(true,true);
+        group.traverse(mesh=>{if(mesh.isMesh&&materials.includes(mesh.material))full.union(new THREE.Box3().setFromObject(mesh));});
+      }else full.union(new THREE.Box3().setFromObject(group));
+    });if(full.isEmpty())return;const center=full.getCenter(new THREE.Vector3());let target=center.clone(),size=full.getSize(new THREE.Vector3()),direction=new THREE.Vector3(1,.7,1),detail=false;
     const mapped=Object.fromEntries(topic[1].map((key,i)=>[key,groups[i]]));
     if(topic[0]==='防火區劃'||topic[0].includes('積水')||topic[0].includes('排水')){
       // Principal horizontal axis of the actual geometry, not the world axes.
@@ -103,7 +111,7 @@ export function createInformation(viewer){
     }
     // Whole-building teaching shots should read as a large model, not a thumbnail.
     // Keep the already-close window/joint shots at their existing distance.
-    if(!detail)distance=Math.max(8,distance*.55);
+    if(!detail)distance=Math.max(8,distance*.92);
     const position=target.clone().add(direction.normalize().multiplyScalar(distance));
     viewer._override=true;viewer._hold=true;viewer.controls.autoRotate=false;viewer.swing.on=false;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,activeTicket=ticket;
