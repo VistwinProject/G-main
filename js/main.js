@@ -1,5 +1,5 @@
 import { Viewer } from './viewer.js';
-import { createInformation } from './information.js';
+import { createInformation, createPreventionPage } from './information.js';
 import { createCountdown } from './countdown.js';
 import { createEditor } from './editor.js';
 import { createSync } from './sync.js';
@@ -10,7 +10,8 @@ import { createGuideStore } from './guides.js';
    ENTER → 首頁 / ESC → 第一頁
    （原本按 0 / 1 的綠色、紅色空白頁已經拿掉）
    ========================================================= */
-const PAGES = ['intro', 'first', 'home', 'outro'];
+createPreventionPage();
+const PAGES = ['intro', 'first', 'home', 'prevention', 'outro'];
 
 /* 首頁逃生動線示範的節奏常數（editors 也用得到，所以放最上面） */
 /* 動線的節奏：**動線上的點照路徑長度等速跑**（秒數 = 長度 ÷ ROUTE_SPEED）。
@@ -331,6 +332,10 @@ function goto(id) {
   if (!pageEls.has(id) || id === current) return;
   current = id;
   for (const [key, el] of pageEls) el.classList.toggle('is-active', key === id);
+  document.querySelectorAll('[data-go-page]').forEach(button => {
+    if (button.dataset.goPage === id) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
 
   closeEditors(id);                // 換頁就關掉其他頁的編輯模式
   if (id !== 'home') { resetRouteDemo(); stopIdleFx(); }    // 離開首頁：收掉動線、關掉通關訊息、主色回原本的
@@ -340,9 +345,10 @@ function goto(id) {
 
   // 同一顆 renderer 搬到當前頁的 3D 容器，其餘頁面就卸下來
   // 兩頁的佔位模型不同：第一頁是單層平面圖，首頁是三層大樓
-  const host = { intro: introStage, first: stage, home: homeStage, outro: outroStage }[id];
+  const host = { intro: introStage, first: stage, home: homeStage, prevention: document.getElementById('stage-prevention'), outro: outroStage }[id];
   if (host) {
-    viewer.setScene(id === 'home' ? 'tower' : 'flat');
+    viewer.setScene(id === 'home' || id === 'prevention' ? 'tower' : 'flat');
+    if (id === 'prevention') viewer.hideIdleFire('tower');
     // 只有前言頁把動線收起來（只留建物線當底圖）；第一頁和結語頁都要看得到動線
     viewer.setRoutesVisible('flat', id !== 'intro');
     // 前言／結語只把**建物**壓淡，動線維持原本的亮度（veil 夾在中間，見 viewer.setPlanDim）。
@@ -376,6 +382,10 @@ function goto(id) {
     }, INTRO_HOLD);
   }
 }
+
+document.querySelectorAll('[data-go-page]').forEach(button => button.addEventListener('click', () => {
+  welcomeDone = true; introDone = true; goto(button.dataset.goPage);
+}));
 
 addEventListener('keydown', (e) => {
   if (e.repeat) return;

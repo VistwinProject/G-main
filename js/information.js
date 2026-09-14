@@ -29,8 +29,25 @@ export const disasters = [
   ]}
 ];
 
+export function createPreventionPage(){
+  const page=document.createElement('section');page.className='page page--home page--prevention';page.dataset.page='prevention';
+  const home=document.querySelector('[data-page="home"]');
+  const brand=home.querySelector('.home__brand').cloneNode(true);
+  brand.removeAttribute('data-obj');brand.removeAttribute('data-label');
+  page.innerHTML='<div class="grain"></div><div class="prevention-heading"></div><p class="prevention-subtitle">先行預防</p><div class="stage prevention-stage" id="stage-prevention"></div>';
+  page.querySelector('.prevention-heading').append(brand);document.getElementById('app').append(page);
+  const nav=document.createElement('nav');nav.className='page-nav';nav.setAttribute('aria-label','展示頁面切換');
+  [['intro','01','前言介紹'],['first','02','黃金30秒'],['home','03','逃生動線'],['prevention','04','先行預防']].forEach(([key,number,label])=>{
+    const button=document.createElement('button');button.type='button';button.dataset.goPage=key;button.innerHTML=`<span>${number}</span>${label}`;nav.append(button);
+  });
+  const skin=document.getElementById('skin-toggle');nav.append(skin);
+  const skinLabel=document.createElement('span');skinLabel.className='skin-toggle__label';skin.append(skinLabel);
+  const label=()=>{skinLabel.textContent=skin.getAttribute('aria-label')?.includes('淺色')?'淺色版':'深色版';};label();new MutationObserver(label).observe(skin,{attributes:true,attributeFilter:['aria-label']});
+  document.getElementById('app').append(nav);
+}
+
 export function createInformation(viewer){
-  const page=document.querySelector('[data-page="home"]');
+  const page=document.querySelector('[data-page="prevention"]');
   const nav=document.createElement('nav');nav.className='information-nav';nav.setAttribute('aria-label','災害科普');
   const panel=document.createElement('aside');panel.className='information-panel';panel.hidden=true;panel.setAttribute('aria-label','建築防災科普');
   panel.innerHTML='<header><h2></h2><button type="button" aria-label="關閉科普解說">關閉</button></header><div class="information-topics"></div><h3></h3><p class="information-description"></p><p class="information-action"></p><p class="information-status" role="status"></p><p class="information-note">教學示意｜紅色代表選取的構件，不代表損壞或警報。構件用途與災害關聯包含推測，非本棟性能認證或即時避難指引。</p>';
