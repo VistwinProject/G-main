@@ -37,7 +37,7 @@ export function createPreventionPage(){
   page.innerHTML='<div class="grain"></div><div class="prevention-heading"></div><p class="prevention-subtitle">先行預防</p><div class="stage prevention-stage" id="stage-prevention"></div>';
   page.querySelector('.prevention-heading').append(brand);document.getElementById('app').append(page);
   const nav=document.createElement('nav');nav.className='page-nav';nav.setAttribute('aria-label','展示頁面切換');
-  [['intro','01','前言介紹'],['first','02','黃金30秒'],['home','03','逃生動線'],['prevention','04','先行預防'],['outro','05','結語']].forEach(([key,number,label])=>{
+  [['welcome','00',''],['intro','01','前言介紹'],['first','02','黃金30秒'],['home','03','逃生動線'],['prevention','04','先行預防'],['outro','05','結語']].forEach(([key,number,label])=>{
     const button=document.createElement('button');button.type='button';button.dataset.goPage=key;button.innerHTML=`<span>${number}</span>${label}`;nav.append(button);
   });
   const skin=document.getElementById('skin-toggle');nav.append(skin);
