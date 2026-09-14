@@ -52,6 +52,15 @@ export function createInformation(viewer){
   const panel=document.createElement('aside');panel.className='information-panel';panel.hidden=true;panel.setAttribute('aria-label','建築防災科普');
   panel.innerHTML='<header><h2></h2><button type="button" aria-label="關閉科普解說">關閉</button></header><div class="information-topics"></div><h3></h3><p class="information-description"></p><p class="information-action"></p><p class="information-status" role="status"></p><p class="information-note">教學示意｜紅色代表選取的構件，不代表損壞或警報。構件用途與災害關聯包含推測，非本棟性能認證或即時避難指引。</p>';
   page.append(nav,panel);
+  const stage=document.getElementById('stage-prevention');
+  function sizeStage(){
+    const bounds=page.getBoundingClientRect(),upper=nav.getBoundingClientRect(),lower=document.querySelector('.page-nav').getBoundingClientRect();
+    if(!bounds.height||!bounds.width)return;
+    const scale=page.clientHeight/bounds.height;
+    const top=(upper.bottom-bounds.top+5)*scale,bottom=(lower.top-bounds.top-5)*scale;
+    stage.style.top=`${top}px`;stage.style.height=`${Math.max(100,bottom-top)}px`;
+    viewer.resize();
+  }
   const root=new THREE.Group();root.name='information-components';viewer.modelRoot.add(root);
   let cameraLimits=null,driftTimer=null;
   function stopDrift(){clearTimeout(driftTimer);driftTimer=null;}
@@ -63,16 +72,17 @@ export function createInformation(viewer){
   function boxes(group){if(!group)return [];group.updateWorldMatrix(true,true);return group.children.filter(x=>x.isMesh).map(mesh=>new THREE.Box3().setFromObject(mesh)).filter(box=>!box.isEmpty());}
   function focusTopic(topic,groups){
     if(!page.classList.contains('is-active'))return;
+    sizeStage();
     if(!groups.length){overview.click();return;}
     root.updateWorldMatrix(true,true);
-    const full=new THREE.Box3();groups.forEach(group=>{
+    const full=new THREE.Box3(),framingMeshes=[];groups.forEach(group=>{
       if(group===viewer.customModels.tower){
         // Hidden route runners/smoke helpers can extend to the origin. They must
         // not pull the building's framing center below its actual geometry.
         const materials=Object.values(viewer._blueprintMats??{});
         group.updateWorldMatrix(true,true);
-        group.traverse(mesh=>{if(mesh.isMesh&&materials.includes(mesh.material))full.union(new THREE.Box3().setFromObject(mesh));});
-      }else full.union(new THREE.Box3().setFromObject(group));
+        group.traverse(mesh=>{if(mesh.isMesh&&materials.includes(mesh.material)){full.union(new THREE.Box3().setFromObject(mesh));framingMeshes.push(mesh);}});
+      }else {full.union(new THREE.Box3().setFromObject(group));group.traverse(mesh=>{if(mesh.isMesh)framingMeshes.push(mesh);});}
     });if(full.isEmpty())return;const center=full.getCenter(new THREE.Vector3());let target=center.clone(),size=full.getSize(new THREE.Vector3()),direction=new THREE.Vector3(1,.7,1),detail=false;
     const mapped=Object.fromEntries(topic[1].map((key,i)=>[key,groups[i]]));
     if(topic[0]==='防火區劃'||topic[0].includes('積水')||topic[0].includes('排水')){
@@ -105,13 +115,20 @@ export function createInformation(viewer){
     const fit=detail?new THREE.Box3().setFromCenterAndSize(target,size):full;
     const fov=THREE.MathUtils.degToRad(viewer.camera.fov),tanY=Math.tan(fov/2),tanX=tanY*viewer.camera.aspect;
     let distance=5;
-    for(const x of [fit.min.x,fit.max.x])for(const y of [fit.min.y,fit.max.y])for(const z of [fit.min.z,fit.max.z]){
-      const p=new THREE.Vector3(x,y,z).sub(target),depth=p.dot(forward);
-      distance=Math.max(distance,depth+Math.abs(p.dot(right))/(tanX*.88),depth+Math.abs(p.dot(up))/(tanY*.76));
+    const projected=[];
+    function include(v){const p=v.sub(target);projected.push([p.dot(right),p.dot(up),p.dot(forward)]);}
+    if(detail){for(const x of [fit.min.x,fit.max.x])for(const y of [fit.min.y,fit.max.y])for(const z of [fit.min.z,fit.max.z])include(new THREE.Vector3(x,y,z));}
+    else framingMeshes.forEach(mesh=>{const p=mesh.geometry.attributes.position;for(let i=0;i<p.count;i++)include(new THREE.Vector3().fromBufferAttribute(p,i).applyMatrix4(mesh.matrixWorld));});
+    // Use occupied geometry, not the empty corners of a rotated world bounding box.
+    // Solve vertical framing first, then retain only the horizontal safety constraint.
+    for(const [x,y,z] of projected)distance=Math.max(distance,z+Math.abs(x)/(tanX*.96),z+Math.abs(y)/(tanY*.96));
+    // Center the perspective silhouette, which need not share the world-box center.
+    for(let pass=0;pass<3;pass++){
+      let lo=Infinity,hi=-Infinity;
+      for(const [,y,z] of projected){const value=y/(distance-z);lo=Math.min(lo,value);hi=Math.max(hi,value);}
+      const offset=(lo+hi)*.5*distance;target.addScaledVector(up,offset);projected.forEach(p=>p[1]-=offset);
+      distance=5;for(const [x,y,z] of projected)distance=Math.max(distance,z+Math.abs(x)/(tanX*.96),z+Math.abs(y)/(tanY*.96));
     }
-    // Whole-building teaching shots should read as a large model, not a thumbnail.
-    // Keep the already-close window/joint shots at their existing distance.
-    if(!detail)distance=Math.max(8,distance*.92);
     const position=target.clone().add(direction.normalize().multiplyScalar(distance));
     viewer._override=true;viewer._hold=true;viewer.controls.autoRotate=false;viewer.swing.on=false;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,activeTicket=ticket;
@@ -120,7 +137,7 @@ export function createInformation(viewer){
       if(reduced)return;
       driftTimer=setTimeout(()=>{
         if(activeTicket!==ticket||!page.classList.contains('is-active')||panel.hidden)return;
-        const near={pos:target.clone().add(position.clone().sub(target).multiplyScalar(.91)).toArray(),target:target.toArray()};
+        const near={pos:target.clone().add(position.clone().sub(target).multiplyScalar(1.025)).toArray(),target:target.toArray()};
         function glide(next){if(activeTicket!==ticket||!page.classList.contains('is-active')||panel.hidden)return;viewer._flyTo(next,14,()=>glide(next===near?shot:near));}
         glide(near);
       },3000);
@@ -152,5 +169,7 @@ export function createInformation(viewer){
     const topics=panel.querySelector('.information-topics');topics.replaceChildren();disaster.topics.forEach(topic=>{const b=document.createElement('button');b.type='button';b.textContent=topic[0];b.setAttribute('aria-pressed','false');b.onclick=()=>selectTopic(topic,b);topics.append(b);});topics.firstElementChild.click();
   });});
   panel.querySelector('header button').onclick=()=>{++ticket;overview.click();root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
-  return {enter(){if(viewer.customModels.tower)overview.click();}};
+  let resizeTimer;
+  addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(page.classList.contains('is-active')){sizeStage();overview.click();}},180);});
+  return {enter(){sizeStage();if(viewer.customModels.tower)overview.click();}};
 }
