@@ -8,3 +8,7 @@
 .welcome-caption-track{white-space:nowrap;width:max-content;will-change:transform}
 :root[data-skin="light"] .welcome-noise{opacity:.08}
 @media(prefers-reduced-motion:reduce){.welcome-noise{animation:none}.welcome-captions{max-height:36%;overflow:auto;font-size:1.7rem}.welcome-caption-track{white-space:normal;width:auto;transform:none!important}}
+.page--welcome .welcome-captions{height:8rem;display:grid;place-items:center;overflow:visible;text-align:center;border:0;background:none;font-size:2.7rem}
+.welcome-captions > p{grid-area:1 / 1;margin:0;max-width:100%;opacity:0;visibility:hidden;transform:translateY(.7rem);transition:opacity .22s ease,transform .22s ease;white-space:normal;text-wrap:balance}
+.welcome-captions > p.voice-current{opacity:1;visibility:visible;transform:translateY(0)}
+@media(prefers-reduced-motion:reduce){.welcome-captions > p{transition:none;transform:none}}
