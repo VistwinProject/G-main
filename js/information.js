@@ -57,7 +57,7 @@ export function createInformation(viewer){
   function stopDrift(){clearTimeout(driftTimer);driftTimer=null;}
   const overview=document.createElement('button');overview.type='button';overview.textContent='回到全景';overview.className='information-overview';panel.querySelector('header').after(overview);
   function restoreLimits(){stopDrift();if(cameraLimits){viewer.controls.minDistance=cameraLimits.min;viewer.controls.maxDistance=cameraLimits.max;cameraLimits=null;}}
-  overview.onclick=()=>{restoreLimits();viewer.releaseShot(1.2);};
+  overview.onclick=()=>{restoreLimits();const tower=viewer.customModels.tower;if(tower)focusTopic(['全景',[]],[tower]);else viewer.releaseShot(1.2);};
   // Cancel topic motion when the visitor starts dragging; keep OrbitControls available.
   viewer.controls.addEventListener('start',()=>{if(page.classList.contains('is-active')){stopDrift();viewer._fly=null;viewer.controls.autoRotate=false;viewer.swing.on=false;}});
   function boxes(group){if(!group)return [];group.updateWorldMatrix(true,true);return group.children.filter(x=>x.isMesh).map(mesh=>new THREE.Box3().setFromObject(mesh)).filter(box=>!box.isEmpty());}
@@ -65,7 +65,7 @@ export function createInformation(viewer){
     if(!page.classList.contains('is-active'))return;
     if(!groups.length){overview.click();return;}
     root.updateWorldMatrix(true,true);
-    const full=new THREE.Box3().setFromObject(root),center=full.getCenter(new THREE.Vector3());let target=center.clone(),size=full.getSize(new THREE.Vector3()),direction=new THREE.Vector3(1,.7,1),detail=false;
+    const full=new THREE.Box3();groups.forEach(group=>full.union(new THREE.Box3().setFromObject(group)));const center=full.getCenter(new THREE.Vector3());let target=center.clone(),size=full.getSize(new THREE.Vector3()),direction=new THREE.Vector3(1,.7,1),detail=false;
     const mapped=Object.fromEntries(topic[1].map((key,i)=>[key,groups[i]]));
     if(topic[0]==='防火區劃'||topic[0].includes('積水')||topic[0].includes('排水')){
       // Principal horizontal axis of the actual geometry, not the world axes.
@@ -86,15 +86,21 @@ export function createInformation(viewer){
       const candidates=boxes(mapped.glass??mapped.frames).filter(box=>{const s=box.getSize(new THREE.Vector3());return Math.max(s.x,s.y,s.z)<8&&Math.max(s.x,s.y,s.z)>.3;});
       candidates.sort((a,b)=>a.getCenter(new THREE.Vector3()).distanceToSquared(viewer.camera.position)-b.getCenter(new THREE.Vector3()).distanceToSquared(viewer.camera.position));
       if(candidates.length){const chosen=candidates[0];target=chosen.getCenter(new THREE.Vector3());size=chosen.getSize(new THREE.Vector3()).multiplyScalar(2.5);detail=true;direction.copy(target).sub(center);direction.y=.6;if(direction.length()<.1)direction.set(1,.3,1);
-        const windowArea=chosen.clone().expandByScalar(.15);
-        for(const key of ['glass','frames']){const group=mapped[key];if(!group)continue;for(let i=0;i<group.children.length;i+=2){const mesh=group.children[i],bounds=new THREE.Box3().setFromObject(mesh),mid=bounds.getCenter(new THREE.Vector3());const visible=windowArea.containsPoint(mid);mesh.visible=visible;if(group.children[i+1])group.children[i+1].visible=visible;}}
       }
     }else if(topic[0]==='安全梯與阻煙'){
       const doors=boxes(mapped.doors);if(doors.length){const selected=doors.sort((a,b)=>b.max.y-a.max.y)[0];target=selected.getCenter(new THREE.Vector3());size.set(9,9,9);detail=true;direction.set(1,1.1,1);}
     }
     cameraLimits??={min:viewer.controls.minDistance,max:viewer.controls.maxDistance};viewer.controls.minDistance=2;viewer.controls.maxDistance=Math.max(cameraLimits.max,180);
-    const fov=THREE.MathUtils.degToRad(viewer.camera.fov),extent=detail?Math.max(size.x,size.y,size.z):Math.max(size.x,size.z,size.y);
-    const distance=Math.max(5,extent/(2*Math.tan(fov/2))*1.3);
+    // Fit the projected bounds to the model area, accounting for horizontal FOV.
+    // The previous max-dimension/vertical-FOV fit left wide top views too small.
+    const forward=direction.clone().normalize(),right=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),forward).normalize(),up=new THREE.Vector3().crossVectors(forward,right);
+    const fit=detail?new THREE.Box3().setFromCenterAndSize(target,size):full;
+    const fov=THREE.MathUtils.degToRad(viewer.camera.fov),tanY=Math.tan(fov/2),tanX=tanY*viewer.camera.aspect;
+    let distance=5;
+    for(const x of [fit.min.x,fit.max.x])for(const y of [fit.min.y,fit.max.y])for(const z of [fit.min.z,fit.max.z]){
+      const p=new THREE.Vector3(x,y,z).sub(target),depth=p.dot(forward);
+      distance=Math.max(distance,depth+Math.abs(p.dot(right))/(tanX*.88),depth+Math.abs(p.dot(up))/(tanY*.76));
+    }
     const position=target.clone().add(direction.normalize().multiplyScalar(distance));
     viewer._override=true;viewer._hold=true;viewer.controls.autoRotate=false;viewer.swing.on=false;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,activeTicket=ticket;
@@ -117,7 +123,7 @@ export function createInformation(viewer){
     if(!cache.has(key))cache.set(key,new GLTFLoader().loadAsync(`./models/information/component-${key}.gltf`).then(({scene})=>{
       scene.updateMatrixWorld(true);const group=new THREE.Group();
       scene.traverse(source=>{if(!source.isMesh)return;const geometry=source.geometry.clone();geometry.applyMatrix4(source.matrixWorld);
-        const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:key==='doors'?.85:.32,depthWrite:false,depthTest:false,side:THREE.DoubleSide}));mesh.renderOrder=90;group.add(mesh);
+        const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:key==='doors'?.85:(key==='glass'||key==='frames')?0:.32,depthWrite:false,depthTest:false,side:THREE.DoubleSide}));mesh.renderOrder=90;group.add(mesh);
         const lines=new THREE.LineSegments(new THREE.EdgesGeometry(geometry,30),new THREE.LineBasicMaterial({color:0xff4545,transparent:true,opacity:.85,depthTest:false,depthWrite:false}));lines.renderOrder=91;group.add(lines);
       });return group;
     }).catch(error=>{cache.delete(key);throw error;}));return cache.get(key);
@@ -135,4 +141,5 @@ export function createInformation(viewer){
     const topics=panel.querySelector('.information-topics');topics.replaceChildren();disaster.topics.forEach(topic=>{const b=document.createElement('button');b.type='button';b.textContent=topic[0];b.setAttribute('aria-pressed','false');b.onclick=()=>selectTopic(topic,b);topics.append(b);});topics.firstElementChild.click();
   });});
   panel.querySelector('header button').onclick=()=>{++ticket;overview.click();root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
+  return {enter(){if(viewer.customModels.tower)overview.click();}};
 }

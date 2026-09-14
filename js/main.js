@@ -151,7 +151,7 @@ const outroStage = document.getElementById('stage-outro');
 const introSpark = document.querySelector('.intro__spark');
 const homeStage = document.getElementById('stage-home');
 const viewer = new Viewer();
-createInformation(viewer);
+const information = createInformation(viewer);
 const countdown = createCountdown({
   ticksEl: document.getElementById('ring-ticks'),
   headEl: document.getElementById('ring-head'),
@@ -364,6 +364,7 @@ function goto(id) {
     viewer.setPlanDim(faded ? PLAN_DIM : 1);
     viewer.setRouteBoost('flat', faded);
     viewer.mount(host);
+    if(id==='prevention')information.enter();
     if (id === 'intro') startIntroSpark();       // 進前言頁：換一條起火點，之後每 5 秒再換
     else stopIntroSpark();
     // 結語頁：動線**多久換一條**要對到上面文字**多久換一段**。
