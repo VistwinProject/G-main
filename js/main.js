@@ -50,7 +50,7 @@ const pageEls = new Map(
    ⚠️ 不能用 localStorage —— 那個只在同一台瀏覽器裡有效，跨裝置傳不過去。
    ⚠️ 頁面代號跟給 Pad 的場景名不一樣（first / home 是歷史包袱），這張表就是兩邊的對照。 */
 const PLAN_DIM = 0.18;                      // 前言／結語頁的平面圖建物壓到幾成（動線不受影響）
-const SCENE = { intro: 'intro', first: 'golden30', home: 'aiRoute', outro: 'outro' };
+const SCENE = { welcome:'welcome', intro: 'intro', first: 'golden30', home: 'aiRoute', prevention:'prevention', outro: 'outro' };
 /* Pad 那邊現在也可以手動操作（待機頁點一下、警報頁往上滑），操作會送回轉播站。
    這裡收下來、跟著換頁 —— 不然兩邊會各看各的。
 
@@ -58,7 +58,7 @@ const SCENE = { intro: 'intro', first: 'golden30', home: 'aiRoute', outro: 'outr
    ⚠️ 不會打回圈：goto() 開頭就 `id === current` 直接 return，
       所以「收到 → goto → pushSync → 對方收到 → goto」在第二步就停了。
       轉播站也不會把訊息轉回給發送者本人。 */
-const SCENE_PAGE = { intro: 'intro', golden30: 'first', aiRoute: 'home', outro: 'outro' };
+const SCENE_PAGE = { welcome:'welcome', intro: 'intro', golden30: 'first', aiRoute: 'home', prevention:'prevention', outro: 'outro' };
 
 /* Pad 上的按鈕送過來的指令。對到的就是這一頁畫面上那兩顆「展示／切換逃生動線」
    —— 同一個 playRouteDemo()，不要另外寫一套，不然兩邊的行為會慢慢長歪。
@@ -80,6 +80,8 @@ let padCmdReady = false;
 const sync = createSync({
   role: 'display',
   onState: (s) => {
+    // Display heartbeats describe playback; they are not navigation commands.
+    if(s?._sourceRole==='display')return;
     // Do not let a cached Pad scene skip the audio opening before it finishes.
     try { if (current === 'welcome') return; } catch { return; }
     /* ⚠️ 一定要包 try/catch。這個 callback 是從 WebSocket 的 onmessage 裡叫的，
@@ -92,7 +94,7 @@ const sync = createSync({
     if (page) {
       // 留一行 log：現場才分得出來是「根本沒收到」還是「收到了但沒換頁」
       console.log('[sync] 收到狀態 scene=' + s.scene + ' → goto(' + page + ')');
-      try { goto(page); }            // 同一頁的話 goto 自己會忽略
+      try { goto(page, {remote:true}); }
       catch (e) { console.warn('[sync] 跟著 Pad 換頁失敗（頁面還沒初始化完？）', e); }
     }
 
@@ -160,6 +162,7 @@ const countdown = createCountdown({
   stageEl: document.querySelector('.timer'),
   duration: COUNT_SECONDS,
   onPhase: (idx) => {
+    window.dispatchEvent(new CustomEvent('narration:phase', {detail:idx}));
     // 第二個參數是「這一段有多長」，動線輪播用它決定還放不放得下完整的一條
     viewer.setRoutePhase(idx, PHASE_SECONDS);    // 逃生起點圓點顏色跟著倒數時段（藍→黃→紅）
     const first = pageEls.get('first');          // 第一頁標題「30」與「每一秒都很關鍵」也跟著時段換色
@@ -172,7 +175,23 @@ const countdown = createCountdown({
     goto(WELCOME_TO);
   },
   // 每一輪倒數開始就把基準時間推給 Pad，兩邊才會倒同一個數
-  onCycle: (dur) => { anim = { kind: 'count', t0: Date.now(), dur }; pushSync(); },
+  onCycle: (dur, elapsed = 0) => { anim = { kind: 'count', t0: Date.now() - elapsed * 1000, dur }; pushSync(); },
+});
+countPhaseEls.forEach((panel, index) => {
+  panel.setAttribute('role', 'button');
+  panel.tabIndex = 0;
+  panel.setAttribute('aria-label', `跳至 ${index * PHASE_SECONDS} 秒，播放 ${index * PHASE_SECONDS}–${(index + 1) * PHASE_SECONDS} 秒階段`);
+  const activate = () => {
+    if (current !== 'first' || editors.first?.isEditing()) return;
+    welcomeDone = true;
+    countdown.seek(index * PHASE_SECONDS);
+  };
+  panel.addEventListener('click', activate);
+  panel.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();event.stopPropagation();activate();
+    }
+  });
 });
 
 /* 前言頁的紅點：**擺在隨機一條逃生動線的起點上**，不是寫死的座標。
@@ -333,14 +352,14 @@ const params = new URLSearchParams(location.search);
 let current = null;
 const narration = createNarration({navigate: goto});
 
-function goto(id) {
+function goto(id, {remote=false} = {}) {
   if (!pageEls.has(id) || id === current) return;
   current = id;
   narration.enter(id);
   document.getElementById('app').classList.toggle('showing-welcome', id === 'welcome');
   for (const [key, el] of pageEls) el.classList.toggle('is-active', key === id);
   document.querySelectorAll('[data-go-page]').forEach(button => {
-    if (button.dataset.goPage === id) button.setAttribute('aria-current', 'page');
+    if (button.dataset.goPage === id || (id === 'intro' && button.dataset.goPage === 'welcome')) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
 
@@ -377,7 +396,7 @@ function goto(id) {
     viewer.unmount();
   }
 
-  pushSync();                               // 換頁就通知 Pad
+  if(!remote)pushSync();                    // Never echo a received navigation.
 
   // 前言頁停一下自動進「火災黃金30秒」；手動切走就取消，而且只跳這一次
   clearTimeout(introTimer);
@@ -409,7 +428,7 @@ addEventListener('keydown', (e) => {
     case 'Enter': case 'NumpadEnter': welcomeDone = true; introDone = true; goto('home'); break;
     case 'Escape':                    welcomeDone = true; introDone = true; goto('first'); break;
     // A = 回前言頁（回去之後不會再自動跳走，要自己按 Esc）
-    case 'KeyA':                      welcomeDone = true; introDone = true; goto('intro'); break;
+    case 'KeyA':                      welcomeDone = true; introDone = true; goto('welcome'); break;
     // O = 結語頁（接在「恭喜通關」之後，不會自己跳過去，要按 O）
     case 'KeyO':                      welcomeDone = true; introDone = true; goto('outro'); break;
     // B = 回到藍色介面：不在首頁就先進首頁，已經在首頁就把紅／綠收掉回到待機
@@ -641,6 +660,7 @@ function playRouteDemo(repeat) {
   // 「目前這一條」：待機時＝正在冒煙的那一條（看到哪裡起火就從哪裡逃）；
   // 跑完／通關之後＝上一次跑的那一條。兩顆按鈕都以它為基準，一個重複、一個避開。
   const cur = routeState === 'idle' ? viewer.idleFireRoute('tower') : lastRoute;
+  window.dispatchEvent(new CustomEvent('narration:route', {detail:repeat?'repeat':'change'}));
   clearTimeout(exitTimer);                  // 上一輪還停在出口的話，別讓它等一下又跳通關
   blackout(() => {
     showClear(false);

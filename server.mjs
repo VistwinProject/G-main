@@ -173,7 +173,7 @@ server.on('upgrade', (req, socket) => {
       if (msg.type === 'hello') { wsSend(c, state); continue; }
 
       // 主展示端送來的狀態：存下來 + 轉給其他人
-      state = { ...state, ...msg, ts: Date.now() };
+      state = { ...state, ...msg, _sourceRole:c.role, ts: Date.now() };
       broadcast(state, c);
     }
   });

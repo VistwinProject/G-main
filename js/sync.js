@@ -58,7 +58,7 @@ export function createSync({ role = 'pad', host: at = null, onState = null, onSt
   }
 
   function send(obj) {
-    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({...obj,_sourceRole:role}));
     // 沒連上就丟掉這一份。重連時會用 hello 去跟轉播站要目前狀態（見 onopen）。
   }
 

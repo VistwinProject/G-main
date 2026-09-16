@@ -70,10 +70,10 @@ export function createCountdown({
 
     // 已經過秒數 → 對應階段
     const elapsed = duration - remaining;
-    const idx = remaining >= duration ? -1
+    const idx = remaining >= duration && paused ? -1
       : Math.min(phaseEls.length - 1, Math.floor(elapsed / (duration / phaseEls.length)));
     if (idx !== phaseCache) {
-      phaseEls.forEach((el, i) => el.classList.toggle('is-on', i === idx));
+      phaseEls.forEach((el, i) => {el.classList.toggle('is-on', i === idx);el.setAttribute('aria-pressed',String(i===idx));});
       if (stageEl) {
         if (idx < 0) delete stageEl.dataset.stage;
         else stageEl.dataset.stage = String(idx);
@@ -112,6 +112,18 @@ export function createCountdown({
 
   function pause() { paused = true; }
 
+  function seek(elapsedSeconds) {
+    const elapsed = Math.min(duration, Math.max(0, Number(elapsedSeconds) || 0));
+    startedAt = performance.now() - elapsed * 1000;
+    paused = false;
+    ended = false;
+    litCache = phaseCache = numCache = urgentCache = NaN;
+    onPhase?.(-1); // Restart the route even when reselecting the current phase.
+    paint(duration - elapsed);
+    onCycle?.(duration, elapsed);
+    if (!raf) raf = requestAnimationFrame(frame);
+  }
+
   function stop() {
     cancelAnimationFrame(raf);
     raf = 0;
@@ -119,5 +131,5 @@ export function createCountdown({
   }
 
   paint(duration);
-  return { start, pause, stop, reset };
+  return { start, pause, stop, reset, seek };
 }
