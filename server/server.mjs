@@ -1,17 +1,17 @@
 // 極簡靜態伺服器（ES Module 需要 http:// 才能載入）+ 一個同樣極簡的 WebSocket 轉播站
-// 用法：node server.mjs [port]
+// 用法（monorepo 根目錄）：node server/server.mjs [port]
 import { createServer } from 'node:http';
-import { readFile, writeFile, rm } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { readFile, writeFile, rm, realpath, lstat } from 'node:fs/promises';
+import { extname, join, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 
-const ROOT = fileURLToPath(new URL('.', import.meta.url));
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PORT = Number(process.argv[2] ?? process.env.PORT ?? 5280);
 const MAX_BODY = 512 * 1024;
 // 每頁一個版面檔：layout.json（第一頁）、layout-home.json（首頁）
-const LAYOUT_RE = /^\/layout(-[a-z0-9]+)?\.json$/;
+const LAYOUT_RE = /^\/main\/(layout(?:-[a-z0-9]+)?\.json)$/;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -34,59 +34,78 @@ const TYPES = {
   '.woff2': 'font/woff2',
 };
 
+function inside(root, file) {
+  const rel = relative(root, file);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
 const server = createServer(async (req, res) => {
-  const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-
-  // 編輯模式的版面存檔：寫進專案裡的 layout*.json，不依賴瀏覽器的 localStorage
-  if (LAYOUT_RE.test(url) && req.method !== 'GET') {
-    const LAYOUT = join(ROOT, url.slice(1));
-    if (req.method === 'DELETE') {
-      await rm(LAYOUT, { force: true });
-      res.writeHead(204).end();
-      return;
-    }
-    if (req.method === 'PUT' || req.method === 'POST') {
-      let body = '';
-      for await (const chunk of req) {
-        body += chunk;
-        if (body.length > MAX_BODY) { res.writeHead(413).end('too large'); req.destroy(); return; }
-      }
-      try {
-        JSON.parse(body);                        // 擋掉壞資料，免得寫壞檔案
-        await writeFile(LAYOUT, body, 'utf8');
-        res.writeHead(204).end();
-      } catch {
-        res.writeHead(400).end('bad json');
-      }
-      return;
-    }
-    res.writeHead(405).end('method not allowed');
-    return;
-  }
-
-  const rel = normalize(url === '/' ? '/index.html' : url).replace(/^([/\\])+/, '');
-  const file = join(ROOT, rel);
-
-  if (!file.startsWith(ROOT)) {
-    res.writeHead(403).end('Forbidden');
-    return;
-  }
   try {
-    const body = await readFile(file);
+    // Inspect the raw path before URL normalization can erase traversal segments.
+    const raw = req.url.split('?')[0];
+    let path;
+    try { path = decodeURIComponent(raw); }
+    catch { res.writeHead(400).end('Malformed path'); return; }
+    if (!path.startsWith('/') || /[\\:\0]/.test(path) ||
+        path.split('/').some(part => part.startsWith('.'))) {
+      res.writeHead(403).end('Forbidden'); return;
+    }
+    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    if (path === '/' || path === '/main' || path === '/pad') {
+      if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405).end(); return; }
+      res.writeHead(302, { Location: (path === '/' ? '/main/' : path + '/') + query }).end();
+      return;
+    }
+    const match = /^\/(main|pad)\/(.*)$/.exec(path);
+    if (!match) { res.writeHead(404).end('404 Not Found'); return; }
+    const appRoot = join(ROOT, 'apps', match[1]);
+    const file = resolve(appRoot, match[2] || 'index.html');
+    if (!inside(appRoot, file)) { res.writeHead(403).end('Forbidden'); return; }
+    const layout = LAYOUT_RE.exec(path);
+    if (!['GET', 'HEAD'].includes(req.method)) {
+      if (!layout || !['PUT', 'POST', 'DELETE'].includes(req.method)) {
+        res.writeHead(405).end('method not allowed'); return;
+      }
+      // Direct children only; never follow an existing layout symlink.
+      try {
+        const info = await lstat(file);
+        if (info.isSymbolicLink() || !info.isFile()) { res.writeHead(403).end('Forbidden'); return; }
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      if (req.method === 'DELETE') {
+        await rm(file, { force: true }); res.writeHead(204).end(); return;
+      }
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of req) {
+        size += chunk.length;
+        if (size > MAX_BODY) { res.writeHead(413).end('too large'); return; }
+        chunks.push(chunk);
+      }
+      const body = Buffer.concat(chunks).toString('utf8');
+      try { JSON.parse(body); }
+      catch { res.writeHead(400).end('bad json'); return; }
+      await writeFile(file, body, 'utf8');
+      res.writeHead(204).end(); return;
+    }
+    const canonicalRoot = await realpath(appRoot);
+    const canonicalFile = await realpath(file);
+    if (!inside(canonicalRoot, canonicalFile)) { res.writeHead(403).end('Forbidden'); return; }
+    const body = await readFile(canonicalFile);
     res.writeHead(200, {
       'Content-Type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
       'Cache-Control': 'no-cache',
-      'X-Robots-Tag': 'noindex, nofollow',   // 擋搜尋引擎索引（連非 HTML 檔一起擋）
-    }).end(body);
-  } catch {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('404 Not Found');
+      'X-Robots-Tag': 'noindex, nofollow',
+    }).end(req.method === 'HEAD' ? undefined : body);
+  } catch (error) {
+    const status = ['ENOENT', 'ENOTDIR', 'EISDIR'].includes(error.code) ? 404 : 500;
+    res.writeHead(status).end(status === 404 ? '404 Not Found' : 'Server error');
   }
 });
 
 /* =========================================================================
    WebSocket 轉播站（/ws）
    主展示網站（index.html）把「目前場景 + 動線」丟上來，Pad 收到就同步。
-   Pad 的程式在另一個 repo（VistwinProject/G-pad），它用 ?server= 連到這台的 /ws。
+   Main 位於 /main/，Pad 位於 /pad/，兩者預設連回同一 host 的 /ws。
+   各自 sync.js 與 ?server= 覆寫方式保持原樣。
 
    為什麼是手刻不是裝 ws / socket.io：這個專案從頭到尾**零套件**（three.js 走 importmap CDN），
    現場是一台筆電開熱點跑 node server.mjs 就要能動，不能假設有 npm install 過。
@@ -210,17 +229,18 @@ function lanURLs() {
   return out;
 }
 
-server.listen(PORT, () => {
-  console.log(`serving ${ROOT} → http://localhost:${PORT}`);
-  const urls = lanURLs();
-  if (urls.length) {
-    console.log('\n主展示端開這個網址：');
-    for (const u of urls) console.log(`  ${u}/`);
-    // Pad 是另一個 repo（VistwinProject/G-pad），它連回來的時候要指定「主機是哪一台」，
-    // 所以這裡直接把 ?server= 該填什麼印出來，現場不用自己去查 IP。
-    console.log('');
-    console.log('Pad（G-pad）開它自己的網址，後面加上：');
-    for (const u of urls) console.log(`  ?server=${u.replace('http://', '')}`);
+server.on('error', error => {
+  console.error(error.code === 'EADDRINUSE'
+    ? 'Port ' + PORT + ' is already in use. Stop the existing server and retry.'
+    : error);
+  process.exitCode = 1;
+});
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('Main: http://localhost:' + PORT + '/main/');
+  console.log('Pad:  http://localhost:' + PORT + '/pad/');
+  console.log('WebSocket: ws://localhost:' + PORT + '/ws');
+  for (const url of lanURLs()) {
+    console.log('LAN Main: ' + url + '/main/');
+    console.log('LAN Pad:  ' + url + '/pad/');
   }
-  console.log('');
 });

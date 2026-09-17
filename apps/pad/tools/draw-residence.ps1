@@ -15,7 +15,7 @@
 # =========================================================================
 param(
   [Parameter(Mandatory=$true)][string]$Segs,
-  [string]$Out = 'C:\Users\USER\Desktop\coding\網頁\G-pad\assets\residence.png',
+  [string]$Out = (Join-Path $PSScriptRoot '../assets/residence.png'),
   [int]$Width = 1600,
   [int]$Margin = 54
 )

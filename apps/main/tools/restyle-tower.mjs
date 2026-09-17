@@ -21,12 +21,13 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 
-const IN  = 'C:/Users/USER/Desktop/vb/3層/標準層三層.gltf';
+const IN = process.argv[2];
 // 「只有樓梯」的那一份（使用者另外從 Revit 匯出）。同一份幾何匯出兩次，POSITION 的 min/max
 // 會一模一樣，所以拿包圍盒當指紋就能精準對上（46/46 全中）。
 // ⚠️ 不要用節點名 —— 主檔裡名字含「樓梯」的只有 7 個，而且 4 個其實不是樓梯。
-const STAIR_IN = 'C:/Users/USER/Desktop/vb/3層/梯/樓梯.gltf';
-const OUT = 'restyled.gltf';
+const STAIR_IN = process.argv[3];
+if (!IN || !STAIR_IN) throw new Error('Usage: node apps/main/tools/restyle-tower.mjs <source.gltf> <stairs.gltf>');
+const OUT = new URL('../models/restyled.gltf', import.meta.url);
 
 const g = JSON.parse(await readFile(IN, 'utf8'));
 const acc = g.accessors;

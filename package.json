@@ -1,0 +1,13 @@
+{
+  "name": "g-system",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "test": "node server/verify.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
+

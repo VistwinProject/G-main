@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
-const IN='C:/Users/USER/Desktop/vb/3層/逃/逃生動線.gltf';
-const OUT='C:/Users/USER/Desktop/coding/網頁/fire-golden-30s/models/routes-home.json';
+const IN=process.argv[2];
+if (!IN) throw new Error('Usage: node apps/main/tools/extract-home.mjs <source.gltf>');
+const OUT=new URL('../models/routes-home.json', import.meta.url);
 const g=JSON.parse(await readFile(IN,'utf8'));
 const acc=g.accessors, bvs=g.bufferViews, bufs=g.buffers;
 const bufData=bufs.map(b=>{ if(!b.uri?.startsWith('data:')) throw new Error('external buffer'); return Buffer.from(b.uri.split(',')[1],'base64'); });

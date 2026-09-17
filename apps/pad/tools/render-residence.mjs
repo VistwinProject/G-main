@@ -16,7 +16,8 @@
    ========================================================================= */
 import { readFile } from 'node:fs/promises';
 
-const GLTF = 'C:/Users/USER/Desktop/vb/一層切平面/切平面.gltf';
+const GLTF = process.argv[2];
+if (!GLTF) throw new Error('Usage: node apps/pad/tools/render-residence.mjs <source.gltf>');
 
 /* 要畫哪些構件。⚠️ 玻璃欄杆不收 —— 它是曲面、佔了全模型 94% 的三角形，
    特徵邊會炸出上萬條曲線雜訊，把建築的線條蓋掉。它的底座和立柱是方的，收。 */

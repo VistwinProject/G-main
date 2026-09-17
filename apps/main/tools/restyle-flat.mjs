@@ -17,8 +17,9 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 
-const IN  = 'C:/Users/USER/Desktop/vb/一層切平面/切平面.gltf';
-const OUT = 'restyled1.gltf';
+const IN = process.argv[2];
+if (!IN) throw new Error('Usage: node apps/main/tools/restyle-flat.mjs <source.gltf>');
+const OUT = new URL('../models/restyled1.gltf', import.meta.url);
 
 const g = JSON.parse(await readFile(IN, 'utf8'));
 const acc = g.accessors;

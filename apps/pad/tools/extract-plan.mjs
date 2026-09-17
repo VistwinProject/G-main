@@ -25,12 +25,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const GLTF   = 'C:/Users/USER/Desktop/vb/一層切平面/切平面.gltf';
+const GLTF = process.argv[2];
+if (!GLTF) throw new Error('Usage: node apps/pad/tools/extract-plan.mjs <source.gltf> [routes-home.json]');
 // ⚠️ 要用 routes-**home**.json，不是 routes.json。
 //    首頁（大螢幕真的在跑動線的那一頁）載的是 home 這一份，它每條動線在住戶這一層走完之後
 //    還會**往下走樓梯**；routes.json 是第一頁那顆切平面模型用的，最後一段不一樣。
 //    Pad 要跟大螢幕的小人同步，就得用大螢幕實際在跑的那一份。
-const ROUTES = 'C:/Users/USER/Desktop/coding/網頁/fire-golden-30s/models/routes-home.json';
+const ROUTES = process.argv[3] || new URL('../../main/models/routes-home.json', import.meta.url);
 const OUT    = fileURLToPath(new URL('../js/plan-data.js', import.meta.url));
 
 /* 哪些東西要進底圖，以及它們在圖上算哪一層。
