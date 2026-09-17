@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createDetectionDiscs } from './detection-discs.js';
 
 export const disasters = [
   {
@@ -157,6 +158,9 @@ export function createInformation(viewer){
   const panel=document.createElement('aside');panel.className='information-panel';panel.hidden=true;panel.setAttribute('aria-label','建築防災科普');
   panel.innerHTML='<header><h2></h2><button type="button" aria-label="關閉科普解說">關閉</button></header><div class="information-topics"></div><h3></h3><p class="information-description"></p><p class="information-action"></p><p class="information-status" role="status"></p><p class="information-note">教學示意｜紅色代表選取的構件，不代表損壞或警報。構件用途與災害關聯包含推測，非本棟性能認證或即時避難指引。</p>';
   page.append(nav,panel);
+  const detectionNote=document.createElement('p');detectionNote.className='detection-note';detectionNote.textContent='紅色圓盤為偵測設備示意，非實際設備位置、數量或警報。';detectionNote.hidden=true;panel.append(detectionNote);
+  let detection=null;
+  function clearDetection(){detection?.dispose();detection=null;detectionNote.hidden=true;}
   const stage=document.getElementById('stage-prevention');
   function sizeStage(){
     const bounds=page.getBoundingClientRect(),upper=nav.getBoundingClientRect(),lower=(document.querySelector('.narration-dock:not([hidden])')||document.querySelector('.page-nav')).getBoundingClientRect();
@@ -249,7 +253,7 @@ export function createInformation(viewer){
     });
   }
   // Match the original tower coordinates; no independent normalization or camera changes.
-  const visibility=new MutationObserver(()=>{root.visible=page.classList.contains('is-active')&&!panel.hidden;if(!page.classList.contains('is-active')){++ticket;restoreLimits();}});
+  const visibility=new MutationObserver(()=>{root.visible=page.classList.contains('is-active')&&!panel.hidden;if(!page.classList.contains('is-active')){++ticket;clearDetection();restoreLimits();}});
   visibility.observe(page,{attributes:true,attributeFilter:['class']});
   const cache=new Map();let ticket=0;
   async function component(key){
@@ -265,7 +269,15 @@ export function createInformation(viewer){
     window.dispatchEvent(new CustomEvent('narration:topic',{detail:topic[0]}));
     panel.querySelectorAll('.information-topics button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
     panel.querySelector('h3').textContent=topic[0];panel.querySelector('.information-description').textContent=topic[2];panel.querySelector('.information-action').textContent=topic[3];
-    const status=panel.querySelector('.information-status');const id=++ticket;stopDrift();viewer._fly=null;root.clear();root.visible=true;
+    const status=panel.querySelector('.information-status');const id=++ticket;stopDrift();viewer._fly=null;clearDetection();root.clear();root.visible=true;
+    if(topic[0]==='偵測與初期應變'){
+      try{
+        const [slabs,walls]=await Promise.all(['slabs','walls'].map(component));if(id!==ticket)return;
+        detection=createDetectionDiscs(slabs,walls);root.add(detection.group);detectionNote.hidden=false;
+        const tower=viewer.customModels.tower;focusTopic(topic,tower?[tower]:[detection.group]);
+      }catch{status.textContent='偵測示意載入未完成，請重新選取。';}
+      return;
+    }
     status.textContent=topic[1].length?'正在載入相關構件…':'此主題以文字說明，不以其他構件代替設備。';
     try{const groups=await Promise.all(topic[1].map(component));if(id!==ticket)return;groups.forEach(g=>{g.children.forEach(child=>child.visible=true);root.add(g);});focusTopic(topic,groups);status.textContent=groups.length?'紅色構件：'+topic[0]+' · 可拖曳調整視角':status.textContent;}
     catch{if(id===ticket)status.textContent='構件載入未完成，請重新選取主題。';}
@@ -274,7 +286,7 @@ export function createInformation(viewer){
     panel.hidden=false;page.classList.add('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));panel.querySelector('h2').textContent=disaster.name+' · 建築防護';
     const topics=panel.querySelector('.information-topics');topics.replaceChildren();disaster.topics.forEach(topic=>{const b=document.createElement('button');b.type='button';b.textContent=topic[0];b.setAttribute('aria-pressed','false');b.onclick=()=>selectTopic(topic,b);topics.append(b);});topics.firstElementChild.click();
   });});
-  panel.querySelector('header button').onclick=()=>{window.dispatchEvent(new CustomEvent('narration:topic',{detail:null}));++ticket;overview.click();root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
+  panel.querySelector('header button').onclick=()=>{window.dispatchEvent(new CustomEvent('narration:topic',{detail:null}));++ticket;clearDetection();overview.click();root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
   let resizeTimer;
   addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(page.classList.contains('is-active')){sizeStage();overview.click();}},180);});
   return {enter(){sizeStage();if(viewer.customModels.tower)overview.click();}};

@@ -22,3 +22,5 @@
 .prevention-stage{left:1%;top:27%;width:63%;height:61%}
 .information-panel .information-action{color:#79e6a2;font-weight:600}
 [data-skin="light"] .information-panel .information-action{color:#16713d}
+.information-panel .detection-note{margin-top:auto;font-size:1.2rem;color:var(--ink-2);line-height:1.5}
+.detection-note[hidden]{display:none}
