@@ -46,6 +46,7 @@ export function createSync({ role = 'pad', host: at = null, onState = null, onSt
     };
     ws.onmessage = (e) => {
       let s; try { s = JSON.parse(e.data); } catch { return; }
+      if(s?.type==='voice'){window.dispatchEvent(new CustomEvent('pad:voice',{detail:s}));return;}
       if (s && typeof s === 'object' && !s.type) onState?.(s);
     };
     ws.onclose = () => { onStatus?.(false); schedule(); };

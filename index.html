@@ -364,8 +364,30 @@
        會被誤判成程式壞了。這行字就是要把那個情況講明白。
        ⚠️ 放在 .pad__main 裡面，因為它已經是 position:relative。掛到 body 底下就得
           替 body 加定位，那會改掉其他絕對定位元素的參考框。 -->
+  <section class="pad__prevention" aria-label="先行預防科普" aria-live="polite">
+    <div class="prevention-heading"><span>04 / PREVENTION</span><h1>先行預防</h1><p>認識建築防護，從日常開始</p></div>
+    <div class="prevention-disasters" aria-label="選擇災害"></div>
+    <div id="p-topic-buttons" class="prevention-topics" aria-label="選擇科普主題" hidden></div>
+    <article class="prevention-card"><p id="p-disaster">建築防災科普</p><h2 id="p-topic">請選擇科普主題</h2><p id="p-description">點選上方災害與下方科普主題，主螢幕會同步展示。</p></article>
+    <aside class="prevention-advice" hidden><span>日常安全提醒</span><p id="p-action"></p></aside>
+    <p class="prevention-caption">雙向同步選題 · 教育展示，非即時警報</p>
+  </section>
   <p class="pad__toast" id="toast" role="status" aria-live="polite"></p>
 </main>
+<nav class="pad-page-nav" aria-label="展示頁面切換">
+  <button id="page-menu-toggle" type="button" aria-expanded="false" aria-controls="page-menu">☰ 頁面選單</button>
+  <div id="page-menu" hidden>
+    <button type="button" data-scene="welcome">01 前言介紹</button>
+    <button type="button" data-scene="golden30">02 黃金30秒</button>
+    <button type="button" data-scene="aiRoute">03 逃生動線</button>
+    <button type="button" data-scene="prevention">04 先行預防</button>
+    <button type="button" data-scene="outro">05 結語</button>
+    <button id="page-menu-skin" type="button">☀ 切換淺色模式</button>
+    <button id="page-menu-close" type="button">收合 −</button>
+  </div>
+</nav>
+<div class="pad-voice" aria-label="旁白語音球"><div id="pad-voice-orb"></div><p id="pad-voice-status" hidden></p></div>
+<script type="module" src="./js/voice-orb.js"></script>
 
 
 <footer class="pad__foot">

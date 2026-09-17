@@ -56,6 +56,8 @@ const els = {
    state 決定配色和動畫（css 的 body[data-state]）：
      safe 藍 / alarm 紅 / guide 藍 / clear 綠 */
 const VIEW = {
+  welcome: () => ({ view:'idle', state:'safe' }),
+  prevention: () => ({ view:'prevention', state:'safe' }),
   // 待機頁的文案全部寫在 index.html 裡（含天氣和三張狀態卡那些寫死的展示值），
   // 這邊只要切版面；會動的只有時鐘和電量。
   intro: () => ({ view: 'idle', state: 'safe' }),
@@ -99,20 +101,34 @@ let anim = null;
 let raf = 0;
 let tick = 0;
 
-const elapsed = () => anim ? anim.at0 + (performance.now() - anim.base) / 1000 : 0;
+const elapsed = () => {
+  if(!anim)return 0;
+  const age=(performance.now()-anim.base)/1000;
+  return anim.at0+age+(anim.correction||0)*Math.min(1,age/2);
+};
 
 function setAnim(s) {
   const a = s?.anim;
   if (!a || !(a.dur > 0)) { anim = null; return; }
   const at0 = Math.max(0, ((s.now ?? a.t0) - a.t0) / 1000);
+  if(anim&&anim.kind===a.kind&&anim.t0===a.t0){
+    if((s.now??0)<=(anim.lastNow??0))return;
+    anim.lastNow=s.now??0;
+    const current=elapsed(),delta=at0-current;
+    if(Math.abs(delta)<.25)return;
+    // Correct ordinary heartbeat jitter gradually, never snap backwards.
+    anim.at0=current;anim.base=performance.now();anim.correction=Math.max(-1,Math.min(1,delta));anim.dur=a.dur;
+    return;
+  }
   // 主展示端每秒補推一次同一段動畫。差得不多就不要重設基準 ——
   // 每秒把時間軸拉一下，畫面上就是每秒抽一下。差太多（晚連上、睡醒）才拉回來。
   if (anim && anim.kind === a.kind && anim.t0 === a.t0 && Math.abs(elapsed() - at0) < 0.25) return;
-  anim = { kind: a.kind, t0: a.t0, dur: a.dur, at0, base: performance.now() };
+  anim = { kind: a.kind, t0: a.t0, dur: a.dur, at0, base: performance.now(),lastNow:s.now??0,correction:0 };
 }
 
 let plan = null;          // 目前這條動線的幾何（planFor 的結果）
 let planDone = false;     // 已經抵達出口
+let noticeKey='',lastPaint=0;
 
 /** 小人走到哪 + 剩餘距離。tau 是大螢幕那條動線的進度（含樓梯的全程）。 */
 function paintWalker() {
@@ -136,7 +152,7 @@ function paintWalker() {
 }
 
 function paintNow() {
-  if (els.body.dataset.view === 'notice') paintWalker();
+  if (els.body.dataset.view === 'notice'){paintWalker();lastPaint=performance.now();}
 }
 
 function frame() {
@@ -154,28 +170,33 @@ const TICK_MS = 250;
 function pump() {
   // 只有動線的小人需要每一格重畫。倒數的 anim 照收（主展示端還是會送），
   // 但新版警報頁沒有顯示秒數，所以不用為它開迴圈。
-  if (!anim || anim.kind !== 'route') {
+  if (!anim || anim.kind !== 'route' || planDone || els.body.dataset.view!=='notice') {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     if (tick) { clearInterval(tick); tick = 0; }
     return;
   }
   if (!raf) raf = requestAnimationFrame(frame);
-  if (!tick) tick = setInterval(paintNow, TICK_MS);
+  if (!tick) tick = setInterval(()=>{if(performance.now()-lastPaint>TICK_MS)paintNow();}, TICK_MS);
 }
 
 /** 把「前往 X 出口」那頁填好。平面圖沒資料就整張不畫（寧可少畫也不要畫錯的路）。 */
 function fillNotice(v) {
+  const key=JSON.stringify([v.route,v.exit,!!v.done]);
+  if(key===noticeKey){paintWalker();return;}
+  const sameGeometry=noticeKey&&plan&&plan._selection===JSON.stringify([v.route,v.exit]);
+  noticeKey=key;
   els.lead.textContent = v.lead;
   els.exit.textContent = v.exit;
   els.why.textContent = v.why;
   els.goalName.textContent = `${v.exit} 出口`;
   els.goalFlow.textContent = v.flow;
 
-  plan = planFor(Number.isInteger(v.route) ? v.route : -1, v.exit);
+  if(!sameGeometry){plan = planFor(Number.isInteger(v.route) ? v.route : -1, v.exit);if(plan)plan._selection=JSON.stringify([v.route,v.exit]);}
   planDone = !!v.done;
   els.plan.closest('.ncard').hidden = !plan;
   els.walker.hidden = !plan;
   if (!plan) { els.dist.textContent = '—'; return; }
+  if(sameGeometry){paintWalker();return;}
 
   els.plan.setAttribute('viewBox', plan.viewBox);
   // 底圖整張是固定的，換動線只是換 viewBox；這裡照樣寫一次，省得漏掉第一次的初始化
@@ -253,7 +274,56 @@ document.addEventListener('animationend', (e) => {
   if (e.animationName === 'padTap') els.body.classList.remove('is-buzz');
 });
 
+let preventionCatalog=[],selectedPrevention=null,catalogKey='',lastPadState={};
+function togglePageMenu(open){$('page-menu').hidden=!open;$('page-menu-toggle').setAttribute('aria-expanded',String(open));}
+$('page-menu-toggle').onclick=()=>togglePageMenu($('page-menu').hidden);
+$('page-menu-close').onclick=()=>togglePageMenu(false);
+document.querySelectorAll('[data-scene]').forEach(button=>button.onclick=()=>{
+  if(!sync.isOpen()){toast('尚未連上主螢幕，請確認連線。');return;}
+  const scene=button.dataset.scene;
+  cmdSeq+=1;
+  const payload={scene,phase:'idle',route:-1,exit:null,anim:null,cmd:'page-select',cmdId:cmdTag+'-'+cmdSeq,now:Date.now()};
+  sync.send(payload);render({...lastPadState,...payload});togglePageMenu(false);
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')togglePageMenu(false);});
+function renderPreventionPicker(s){
+  selectedPrevention=s?.prevention;
+  if(Array.isArray(s?.preventionCatalog)){
+    const key=JSON.stringify(s.preventionCatalog);
+    if(key!==catalogKey){
+      catalogKey=key;preventionCatalog=s.preventionCatalog;
+      const root=document.querySelector('.prevention-disasters');root.replaceChildren();
+      preventionCatalog.forEach(d=>{
+        const b=document.createElement('button');b.type='button';b.textContent=d.name;
+        b.onclick=()=>selectPrevention(d.name,d.topics[0]);root.append(b);
+      });
+    }
+  }
+  document.querySelectorAll('.prevention-disasters button').forEach(b=>{
+    const active=b.textContent===selectedPrevention?.disaster;
+    b.classList.toggle('is-selected',active);b.setAttribute('aria-pressed',String(active));
+  });
+  const root=$('p-topic-buttons'),disaster=preventionCatalog.find(d=>d.name===selectedPrevention?.disaster);
+  const key=disaster?.name||'';
+  if(root.dataset.disaster!==key){
+    root.dataset.disaster=key;root.replaceChildren();
+    disaster?.topics.forEach(topic=>{
+      const b=document.createElement('button');b.type='button';b.textContent=topic;
+      b.onclick=()=>selectPrevention(disaster.name,topic);root.append(b);
+    });
+  }
+  root.hidden=!disaster;
+  root.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.textContent===selectedPrevention?.topic)));
+}
+function selectPrevention(disaster,topic){
+  if(!sync.isOpen()){toast('尚未連上主螢幕，請確認連線後再選題。');return;}
+  cmdSeq+=1;
+  sync.send({scene:'prevention',cmd:'prevention-select',cmdId:cmdTag+'-'+cmdSeq,preventionChoice:{disaster,topic},now:Date.now()});
+}
 function render(s) {
+  lastPadState=s??{};
+  document.querySelectorAll('[data-scene]').forEach(b=>{const active=b.dataset.scene===(s?.scene==='intro'?'welcome':s?.scene);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+  renderPreventionPicker(s);
   const make = VIEW[s?.scene] ?? VIEW.intro;
   const v = make(s ?? {});
   setAnim(s);
@@ -262,12 +332,22 @@ function render(s) {
   els.body.dataset.view = v.view ?? 'plain';
   swipe(was, els.body.dataset.view);
   if (v.view === 'notice') fillNotice(v);
+  else if(v.view==='prevention'){
+    const info=s?.prevention;
+    $('p-disaster').textContent=info?.disaster||'建築防災科普';
+    $('p-topic').textContent=info?.topic||'請選擇科普主題';
+    $('p-description').textContent=info?.description||'點選上方災害與下方科普主題，主螢幕會同步展示。';
+    $('p-action').textContent=info?.action||'';
+    document.querySelector('.prevention-advice').hidden=!info?.action;
+    document.querySelectorAll('.prevention-disasters span').forEach(el=>el.classList.toggle('is-selected',el.textContent===info?.disaster));
+  }
   else if (v.view !== 'idle' && v.view !== 'alarm') {
     els.kicker.textContent = v.kicker;
     els.title.textContent = v.title;
     els.sub.textContent = v.sub;
   }
   buzz(els.body.dataset.view);
+  els.foot.textContent=v.view==='prevention'?'先行預防 · 熟悉環境，安心生活':'火災無情 · 預防先行';
   pump();
 }
 
@@ -438,6 +518,7 @@ els.alarmSec?.addEventListener('pointercancel', () => { swipeFrom = null; });
 /* 右上角的太陽／月亮，點一下等於按 S。
    ⚠️ 要宣告在 setSkin **前面** —— setSkin 在載入時就會被呼叫一次（套用存下來的 skin）。 */
 const skinBtn = document.getElementById('skin-toggle');
+const menuSkinBtn = document.getElementById('page-menu-skin');
 
 function setSkin(name) {
   const next = name === 'light' ? 'light' : 'dark';
@@ -446,11 +527,13 @@ function setSkin(name) {
   localStorage.setItem('skin', next);
   // 圖示是 CSS 換的，這裡只把說明文字對上「按下去會變成什麼」
   skinBtn?.setAttribute('aria-label', next === 'light' ? '切換到深色' : '切換到淺色');
+  if(menuSkinBtn){menuSkinBtn.textContent=next==='light'?'☾ 切換深色模式':'☀ 切換淺色模式';menuSkinBtn.setAttribute('aria-label',next==='light'?'切換到深色模式':'切換到淺色模式');}
   return next;
 }
 let skin = setSkin(new URLSearchParams(location.search).get('skin')
                    ?? localStorage.getItem('skin') ?? 'dark');
 skinBtn?.addEventListener('click', () => { skin = setSkin(skin === 'light' ? 'dark' : 'light'); });
+menuSkinBtn?.addEventListener('click', () => { skin = setSkin(skin === 'light' ? 'dark' : 'light'); });
 
 addEventListener('keydown', (e) => {
   if (e.repeat || e.target instanceof HTMLInputElement) return;
