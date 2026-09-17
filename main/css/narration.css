@@ -1,0 +1,46 @@
+.page--welcome{display:grid;place-items:center;background:radial-gradient(100% 80% at 50% 40%,var(--glow-1),transparent 70%),linear-gradient(170deg,var(--bg-1),var(--bg-0) 75%);overflow:hidden}
+.voice-wave{width:76%;height:38%;border:0;background:none;cursor:pointer;padding:0;position:relative}.voice-wave canvas{width:100%;height:100%;display:block}.voice-wave:focus-visible{outline:2px solid #71d5ff;outline-offset:12px}
+.voice-controls{position:absolute;right:3rem;bottom:2.5rem;z-index:22;display:flex;gap:1rem}.voice-controls[hidden]{display:none}.voice-controls button{font:inherit;font-size:1.5rem;color:var(--brand-hi);background:var(--bg-0);border:1px solid var(--brand-line);border-radius:.4rem;padding:1rem;cursor:pointer}
+.voice-controls .voice-error{color:#f88;font-size:1.3rem;max-width:22rem}.voice-synced .intro__roll > *{animation:none!important;opacity:0!important;visibility:hidden;transform:none!important;transition:opacity .18s}.voice-synced .intro__roll > .voice-current{opacity:1!important;visibility:visible}
+.page--welcome .voice-wave{z-index:6}.welcome-noise{position:absolute;inset:0;pointer-events:none;opacity:.12;z-index:5;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23888888' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");background-size:180px 180px;animation:welcome-noise-shift .24s steps(2) infinite}
+@keyframes welcome-noise-shift{to{background-position:47px 29px}}
+.welcome-captions{position:absolute;left:8%;right:8%;bottom:20%;z-index:6;overflow:hidden;padding:1.6rem 0;border-top:1px solid var(--brand-line);border-bottom:1px solid var(--brand-line);color:var(--ink-1);font-size:2.2rem;line-height:1.7;letter-spacing:.08em;background:linear-gradient(90deg,transparent,var(--brand-soft),transparent)}
+.welcome-caption-track{white-space:nowrap;width:max-content;will-change:transform}
+:root[data-skin="light"] .welcome-noise{opacity:.08}
+@media(prefers-reduced-motion:reduce){.welcome-noise{animation:none}.welcome-captions{max-height:36%;overflow:auto;font-size:1.7rem}.welcome-caption-track{white-space:normal;width:auto;transform:none!important}}
+.page--welcome .welcome-captions{height:8rem;display:grid;place-items:center;overflow:visible;text-align:center;border:0;background:none;font-size:2.7rem}
+.welcome-captions > p{grid-area:1 / 1;margin:0;max-width:100%;opacity:0;visibility:hidden;transform:translateY(.7rem);transition:opacity .22s ease,transform .22s ease;white-space:normal;text-wrap:balance}
+.welcome-captions > p.voice-current{opacity:1;visibility:visible;transform:translateY(0)}
+@media(prefers-reduced-motion:reduce){.welcome-captions > p{transition:none;transform:none}}
+.page--welcome .voice-wave{position:absolute;top:6%;left:50%;transform:translateX(-50%);width:min(52rem,58vh);height:auto;aspect-ratio:1}
+.voice-orb{display:block;width:100%;height:100%;position:relative}
+.voice-orb [role="status"]{position:absolute;inset:35% 5% auto;color:var(--ink-1);font-size:1.8rem;line-height:1.6}
+.voice-finish{position:absolute;right:3rem;top:2.5rem;z-index:22;font:inherit;font-size:1.3rem;color:var(--brand-hi);background:var(--bg-0);border:1px solid var(--brand-line);border-radius:.4rem;padding:.8rem 1rem;cursor:pointer}
+.voice-finish[hidden]{display:none}
+.phase[role="button"]{cursor:pointer}
+.phase[role="button"]:hover{filter:brightness(1.15)}
+.phase[role="button"]:focus-visible{outline:2px solid var(--brand-hi);outline-offset:4px}
+/* A single persistent orb moves between the opening and this chapter dock. */
+.narration-dock{position:absolute;left:3rem;bottom:9rem;width:59%;height:10rem;z-index:15;display:flex;align-items:center;gap:1.6rem;pointer-events:none}
+.narration-dock[hidden]{display:none}
+.narration-dock .voice-wave{flex:0 0 6.667rem;width:6.667rem;height:6.667rem;pointer-events:auto}
+.narration-dock .voice-wave[aria-disabled="true"]{cursor:default}
+.narration-dock__caption{flex:1;min-width:0;min-height:6rem;display:flex;align-items:center;font-size:1.8rem;line-height:1.65;color:var(--ink);text-wrap:balance}
+.narration-dock:is([data-page="first"],[data-page="home"],[data-page="prevention"]){height:6.667rem;align-items:flex-end;gap:1.067rem}
+/* Align the visible sphere, compensating for transparent canvas padding. */
+.narration-dock:is([data-page="first"],[data-page="home"],[data-page="prevention"]) .voice-wave{transform:translateY(.75rem)}
+.narration-dock:is([data-page="first"],[data-page="home"],[data-page="prevention"]) .narration-dock__caption{font-size:1.2rem;min-height:4rem;align-items:flex-end}
+.narration-dock[data-page="intro"],.narration-dock[data-page="outro"]{left:50%;bottom:2.667rem;transform:translateX(-50%);width:6.667rem;height:6.667rem;justify-content:center}
+.narration-dock[data-page="intro"] .narration-dock__caption,.narration-dock[data-page="outro"] .narration-dock__caption{display:none}
+.page--main .acts{visibility:hidden;pointer-events:none}
+.page--home .home__acts{visibility:hidden;pointer-events:none}
+.page--home .home__guide{margin-left:auto}
+.page:not(.is-active) .voice-current{visibility:hidden!important;opacity:0!important}
+/* Intro/outro share one horizontal axis, including saved editor layouts. */
+:is(.page--intro,.page--outro) .intro__body{position:static;width:100%;max-width:none;align-items:center}
+:is(.page--intro,.page--outro) :is(.intro__logo,.intro__eyebrow,.intro__roll,.intro__plan){position:absolute!important;left:50%!important;transform:translateX(-50%)!important;transform-origin:center!important;margin-left:0;margin-right:0}
+:is(.page--intro,.page--outro) .intro__eyebrow{top:13rem!important;width:76rem!important;max-width:90%;height:3.2rem!important}
+:is(.page--intro,.page--outro) .intro__roll{top:19rem!important;width:90%!important;height:9rem!important;margin-top:0;text-align:center}
+:is(.page--intro,.page--outro) .intro__roll > *{justify-content:center;text-align:center}
+:is(.page--intro,.page--outro) .intro__plan{top:30rem!important;width:50rem!important;height:18rem!important;margin-top:0}
+:is(.page--intro,.page--outro) .intro__logo{top:auto!important;bottom:11rem;width:14.4rem!important;height:6rem!important}

@@ -1,0 +1,1549 @@
+/* =========================================================
+   火災黃金30秒 — THE GOLDEN 30 SECONDS
+   設計基準 1920 × 1080，以 rem 隨視窗等比縮放
+
+   主色調切換：<html data-theme="blue">（預設）或 "green"
+   也可在 console 執行 __setTheme('green') 即時比較
+   ========================================================= */
+
+/* ---------- 藍色主題（預設） ---------- */
+:root,
+:root[data-theme="blue"]{
+  --bg-0:#020912;
+  --bg-1:#061527;
+  --bg-2:#0a2038;
+
+  --brand:#2f9dff;
+  --brand-hi:#74d4ff;
+  --brand-line:rgba(47,157,255,.22);
+  --brand-soft:rgba(47,157,255,.13);
+
+  --glow-1:rgba(24,96,190,.32);
+  --glow-2:rgba(16,68,140,.24);
+
+  --ink:#eaf6ff;
+  --ink-2:rgba(213,238,255,.66);
+  --ink-3:rgba(178,213,245,.38);
+
+
+  /* 3D 場景（viewer.js 讀取同一組值） */
+  --m-fog:#031020;
+  --m-floor:#0a1c30;
+  --m-slab:#e4efff;      /* 首頁大樓的樓板：偏藍的白 */
+  --m-shade:#4d6a86;     /* 陰影色：通關「整棟變白」時，由上往下壓到這個色，底部才不會一片死白 */
+  --m-wall:#123049;
+  --m-edge:#74d4ff;
+  --m-grid:#2f9dff;
+  --m-grid-2:#1c4a6b;
+}
+
+/* ---------- 綠色主題（原稿） ---------- */
+:root[data-theme="green"]{
+  --bg-0:#020d08;
+  --bg-1:#06190f;
+  --bg-2:#0a2415;
+
+  --brand:#2fe27f;
+  --brand-hi:#63ffae;
+  --brand-line:rgba(47,226,127,.20);
+  --brand-soft:rgba(47,226,127,.13);
+
+  --glow-1:rgba(24,120,72,.30);
+  --glow-2:rgba(18,92,56,.22);
+
+  --ink:#eafff4;
+  --ink-2:rgba(213,255,231,.66);
+  --ink-3:rgba(180,238,210,.36);
+
+
+  --m-fog:#03130c;
+  --m-floor:#0a2417;
+  --m-slab:#e2fff0;
+  --m-shade:#3f7d63;
+  --m-wall:#123d28;
+  --m-edge:#3dffa0;
+  --m-grid:#2fe27f;
+  --m-grid-2:#1c6b45;
+}
+
+/* ---------- 紅色主題 ----------
+   首頁「展示／切換逃生動線」跑動線的那兩秒會切到這一組（js/main.js 的 playRouteDemo），
+   抵達出口就換成綠色。平常不會用到，也可以用 ?theme=red 單獨看。 */
+:root[data-theme="red"]{
+  --bg-0:#100205;
+  --bg-1:#250709;
+  --bg-2:#3a0d0e;
+
+  --brand:#ff4a3d;
+  --brand-hi:#ff9078;
+  --brand-line:rgba(255,74,61,.22);
+  --brand-soft:rgba(255,74,61,.13);
+
+  --glow-1:rgba(190,42,26,.32);
+  --glow-2:rgba(140,28,18,.24);
+
+  --ink:#fff0eb;
+  --ink-2:rgba(255,219,210,.66);
+  --ink-3:rgba(245,190,178,.38);
+
+  --m-fog:#170406;
+  --m-floor:#2a0b0d;
+  --m-slab:#ffeae3;
+  --m-shade:#8a544c;
+  --m-wall:#4a1519;
+  --m-edge:#ff9078;
+  --m-grid:#ff4a3d;
+  --m-grid-2:#6b1f22;
+}
+
+/* ---------- 語意色（不隨主題變動） ---------- */
+:root{
+  --amber:#ffb42e;     /* 警語 */
+  --red:#ff4a3d;       /* 起火點 */
+  --exit:#3dffa0;      /* 安全出口：沿用國際通用的綠色 */
+  --ease:cubic-bezier(.22,.61,.36,1);
+
+  /* 三個時段的代表色，倒數圓盤和右側階段卡共用同一組 */
+  --stage-0:var(--brand-hi);   /* 0-10 秒（剩 30-21）：藍，跟著主色走 */
+  --stage-1:#ffb42e;           /* 10-20 秒（剩 20-11）：黃 */
+  --stage-2:#ff4a3d;           /* 20-30 秒（剩 10-0）：紅 */
+
+  /* ---- 深/淺共用的鉤子（深色的值）----
+     這幾個地方原本把深色寫死在規則裡，淺色版沒辦法只靠色票覆蓋，所以抽成變數。
+     ⚠️ 值跟原本一模一樣，深色外觀不變。淺色的覆蓋在下面 [data-skin="light"]。 */
+  --grain-line:rgba(0,0,0,.16);   /* 掃描線的顏色 */
+  --grain-op:.5;                  /* 掃描線的濃度 */
+  --ico-bg:rgba(0,0,0,.35);       /* 階段卡圓形 icon 的底 */
+  --ico-mix:rgba(0,0,0,.4);       /* icon 亮起時要混進去的底色 */
+  --noise-blend:screen;           /* 按鈕 glitch 雜訊層的混合模式 */
+  --veil:#000;                    /* 切狀態時蓋住 3D 的遮幕 */
+}
+
+/* =========================================================
+   淺色版（白底藍字）—— 按 S 切換，或 ?skin=light
+   ---------------------------------------------------------
+   做法：<html data-skin="light">。這是**跟 data-theme 垂直的另一個維度** ——
+   blue / red / green 三個情境色照舊運作，只是換成淺色的那一套值。
+
+   ⚠️ 選擇器一定要**同時帶 data-skin 和 data-theme**（除了 blue 那組靠排在後面取勝）。
+      單寫 :root[data-skin="light"] 的特異性跟 :root[data-theme="green"] 一樣，
+      切到綠色時會被深綠蓋回去。
+
+   ⚠️ 深色版的「越亮＝越重點」在白底上要**反過來**：
+      --brand-hi 變成比 --brand 更深的藍（標題、數字要跟白底有對比），
+      --brand 退成細框線用的中間藍。不換角色的話標題會比框線還淡。
+   ⚠️ 細框線和淡字要**加不透明度**（.22 → .28、.38 → .50）——
+      深色底吃得住的淡度，白底吃不住，在投影機上會整條消失。
+   ========================================================= */
+:root[data-skin="light"],
+:root[data-skin="light"][data-theme="blue"]{
+  --bg-0:#ffffff;        /* 基底白。畫布留邊（letterbox）也是這個色 */
+  --bg-1:#eef5fd;
+  --bg-2:#e2edfa;
+
+  --brand:#3f97e8;       /* 中間藍：框線、次要圖示 */
+  --brand-hi:#0b5cb8;    /* 深藍：標題、數字、重點字 */
+  --brand-line:rgba(11,92,184,.28);
+  --brand-soft:rgba(63,151,232,.16);
+
+  /* ⚠️ 深色版的漸層是「往亮的方向打光」，白底要反過來**往暗的方向壓**，
+     不然完全看不出漸層（白色上面加白光等於沒加）。 */
+  --glow-1:rgba(120,175,235,.30);
+  --glow-2:rgba(90,150,215,.20);
+
+  --ink:#0b3b6b;         /* 主要文字：深藍，不是黑 */
+  --ink-2:rgba(16,66,116,.72);
+  --ink-3:rgba(22,74,126,.50);
+
+  --m-fog:#f4f8fe;       /* 霧＝底色，遠處才融進背景 */
+  --m-floor:#e6eef8;
+  --m-slab:#d8e7f7;      /* 樓板：白底上不能再用白，改淡藍灰才看得出樓層 */
+  --m-shade:#7f9dbd;
+  --m-wall:#a9c8e6;
+  --m-edge:#0b5cb8;      /* 結構框線要深，白底上才看得見 */
+  --m-grid:#3f97e8;
+  --m-grid-2:#9dc0e0;
+}
+
+:root[data-skin="light"][data-theme="green"]{
+  --bg-0:#fbfffd;  --bg-1:#e9f9f1;  --bg-2:#dcf5e8;
+  --brand:#1fae6c; --brand-hi:#067a45;
+  --brand-line:rgba(6,122,69,.28);  --brand-soft:rgba(31,174,108,.16);
+  --glow-1:rgba(120,205,165,.30);   --glow-2:rgba(85,175,135,.20);
+  --ink:#0a3f28;   --ink-2:rgba(12,74,48,.72);  --ink-3:rgba(20,86,58,.50);
+  --m-fog:#f2fdf7; --m-floor:#e2f5ea; --m-slab:#d5f0e2; --m-shade:#6fa189;
+  --m-wall:#a9dcc2; --m-edge:#067a45; --m-grid:#1fae6c; --m-grid-2:#98c9b0;
+}
+
+/* 跑動線那幾秒用的紅色。⚠️ 這一組也要做淺色，不然按下按鈕會從白跳成深紅。 */
+:root[data-skin="light"][data-theme="red"]{
+  --bg-0:#fffbfa;  --bg-1:#ffeeec;  --bg-2:#ffe2df;
+  --brand:#e8564a; --brand-hi:#c21c0d;
+  --brand-line:rgba(194,28,13,.28); --brand-soft:rgba(232,86,74,.16);
+  --glow-1:rgba(235,150,140,.30);   --glow-2:rgba(215,110,100,.20);
+  --ink:#6b1a12;   --ink-2:rgba(120,32,22,.72); --ink-3:rgba(130,45,35,.50);
+  --m-fog:#fff5f4; --m-floor:#f8e6e4; --m-slab:#f7dcd7; --m-shade:#b07a72;
+  --m-wall:#eab5ae; --m-edge:#c21c0d; --m-grid:#e8564a; --m-grid-2:#d99a92;
+}
+
+/* 語意色和深/淺鉤子（不分情境色，所以不用配 data-theme）。
+   ⚠️ 語意色**調深了**：深色版的 --exit:#3dffa0（亮薄荷綠）和 --amber:#ffb42e
+      在白底上幾乎看不見。色相保留（還是綠／黃／紅），只降明度。
+      「不隨主題變」是指不跟著 blue/red/green 換，不是不能為白底重定亮度。 */
+:root[data-skin="light"]{
+  --amber:#b87400;
+  --red:#d81f10;
+  --exit:#00994f;
+  --stage-1:#b87400;
+  --stage-2:#d81f10;
+
+  /* ⚠️ multiply 在白底上會把線色**完整**顯示出來（深色底才會被吃掉），所以要調淡、改藍調 */
+  --grain-line:rgba(11,92,184,.07);
+  --grain-op:.35;
+  --ico-bg:rgba(11,92,184,.06);
+  --ico-mix:#fff;
+  /* ⚠️ 白色是 screen 的單位元 —— 白底上那層雜訊會整層消失，要改成往暗壓的 multiply */
+  --noise-blend:multiply;
+  --veil:#fff;           /* 切狀態時是「白閃」不是「黑閃」 */
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* =========================================================
+   面板：內部不填色，只有一圈漸層細框（倒角八邊形）
+   ---------------------------------------------------------
+   clip-path 用 evenodd 一次畫出「外框 + 內孔」，中間鏤空，
+   於是元素的 background（漸層）只剩下 --bw 粗的一圈框線。
+   --ci 是內孔的倒角起點：斜邊要往內縮 bw/tan(67.5°) ≈ .5858bw
+   才能讓斜邊和直邊一樣粗。
+   ========================================================= */
+.chamfer{
+  --ch:.62rem;                                   /* 倒角大小 */
+  --bw:.5px;                                     /* 框線粗細 */
+  --ci:calc(var(--ch) + var(--bw) * .5858);
+  --glass:none;                                  /* 內部底色，預設不填 */
+  /* 線細成一半後會被抗鋸齒吃掉約 50% 的濃度，所以透明度要相應調高，
+     最暗的那一段也要留夠，否則右下角會淡到看不見、看起來像缺一條邊 */
+  --stroke:linear-gradient(140deg,
+    color-mix(in srgb, var(--brand-hi) 100%, transparent) 0%,
+    color-mix(in srgb, var(--brand) 72%, transparent) 30%,
+    color-mix(in srgb, var(--brand) 40%, transparent) 64%,
+    color-mix(in srgb, var(--brand) 70%, transparent) 100%);
+
+  /* 實心八邊形，給玻璃層用 */
+  --shape:polygon(
+    var(--ch) 0, calc(100% - var(--ch)) 0,
+    100% var(--ch), 100% calc(100% - var(--ch)),
+    calc(100% - var(--ch)) 100%, var(--ch) 100%,
+    0 calc(100% - var(--ch)), 0 var(--ch));
+
+  /* 外框一圈 + 內孔，evenodd 讓中間鏤空。
+     兩圈都要各自「回到起點」才算閉合：外圈最後補一次 A、內圈最後補一次 P，
+     中間那段 A→P 和收尾的 P→A 完全重疊會互相抵銷，不影響填色。
+     少了這兩個補點，外圈左緣會被當成連接段跳過 → 框線缺左邊那一條。 */
+  --ring:polygon(evenodd,
+    /* 外圈 */
+    0 var(--ch),                                    /* A */
+    var(--ch) 0,
+    calc(100% - var(--ch)) 0,
+    100% var(--ch),
+    100% calc(100% - var(--ch)),
+    calc(100% - var(--ch)) 100%,
+    var(--ch) 100%,
+    0 calc(100% - var(--ch)),
+    0 var(--ch),                                    /* A：閉合外圈 */
+    /* 內圈 */
+    var(--bw) var(--ci),                            /* P */
+    var(--ci) var(--bw),
+    calc(100% - var(--ci)) var(--bw),
+    calc(100% - var(--bw)) var(--ci),
+    calc(100% - var(--bw)) calc(100% - var(--ci)),
+    calc(100% - var(--ci)) calc(100% - var(--bw)),
+    var(--ci) calc(100% - var(--bw)),
+    var(--bw) calc(100% - var(--ci)),
+    var(--bw) var(--ci));                           /* P：閉合內圈 */
+
+  position:relative;border:0;border-radius:0;background:none;
+}
+/* clip-path 會連子元素一起裁掉，所以底色和框線都畫在偽元素上：
+   ::before 是底層玻璃，::after 是上層框線，內容再靠 z-index 浮在最上面 */
+.chamfer::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:var(--glass);
+  clip-path:var(--shape);
+}
+.chamfer::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:var(--stroke);
+  clip-path:var(--ring);
+}
+.chamfer > *{position:relative;z-index:1}
+
+html{
+  /* 1920×1080 時 = 16px；其他尺寸取寬高較小者等比縮放 */
+  font-size:max(8px, min(.8333vw, 1.4814vh));
+  /* 全螢幕看板：不能出現捲軸，否則捲軸會改變 vw/vh 進而改變 rem */
+  overflow:hidden;
+}
+
+/* =========================================================
+   載入中：整片深藍蓋住，等自訂版面套用完才顯示
+   （class 直接寫在 <html> 上，第一次繪製前就生效）
+   ========================================================= */
+html.is-booting{background:var(--bg-0)}
+/* 用 opacity 不用 visibility：visibility 會被子層的 .page.is-active{visibility:visible} 蓋回來。
+   opacity 是整個子樹一起合成，蓋得住；版面照樣算得出來，編輯器量尺寸不受影響。 */
+html.is-booting body{opacity:0;pointer-events:none}
+html.is-booting::after{
+  content:"載入中";
+  position:fixed;inset:0;display:grid;place-items:center;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:.8rem;letter-spacing:.5em;text-indent:.5em;
+  color:var(--ink-3);
+  opacity:0;animation:bootHint .5s ease-out .7s forwards;   /* 秒開時不會閃字 */
+}
+@keyframes bootHint{to{opacity:1}}
+
+body{
+  height:100vh;
+  overflow:hidden;
+  background:var(--bg-0);
+  color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  cursor:default;
+}
+
+svg{display:block}
+/* 只放 <defs>（濾鏡之類）的 svg，不佔版面 */
+.svg-defs{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+
+/* ---------- 頁面容器 ---------- */
+.app{position:relative;width:100vw;height:100vh;overflow:hidden}
+
+.page{
+  position:absolute;inset:0;
+  opacity:0;visibility:hidden;
+  transform:scale(.985);
+  transition:opacity .42s var(--ease), transform .42s var(--ease), visibility .42s;
+}
+.page.is-active{opacity:1;visibility:visible;transform:none}
+
+.page--main{
+  display:flex;flex-direction:column;
+  padding:2.2rem 2.6rem 1.1rem;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(80% 70% at 50% 55%, var(--glow-2), transparent 70%),
+    linear-gradient(170deg, var(--bg-1) 0%, var(--bg-0) 65%);
+}
+
+/* 細微掃描線 */
+.grain{
+  position:absolute;inset:0;pointer-events:none;z-index:5;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.5;
+}
+
+/* ---------- 主格線 ---------- */
+.layout{
+  position:relative;z-index:2;
+  flex:1;min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 25rem;
+  grid-template-rows:minmax(0,1fr) auto;
+  grid-template-areas:
+    "main side"
+    "acts acts";      /* 四格那排橫跨整個版面，才會對到畫面正中 */
+  gap:1.4rem 2.2rem;
+}
+.col-main{grid-area:main;display:flex;flex-direction:column;min-width:0;min-height:0;gap:1.4rem}
+.col-side{grid-area:side;display:flex;flex-direction:column;min-height:0;gap:1.1rem}
+
+/* =========================================================
+   標題
+   ========================================================= */
+.hero{flex:none}
+.hero__zh{
+  font-size:3.5rem;font-weight:700;line-height:1;letter-spacing:.02em;
+  display:flex;align-items:baseline;gap:.1em;
+  text-shadow:0 0 2.4rem var(--brand-soft);
+}
+.hero__num{
+  font-family:"Oswald",sans-serif;font-style:normal;font-weight:600;
+  font-size:1.62em;line-height:.8;letter-spacing:-.01em;
+  color:var(--brand-hi);
+  margin:0 .06em;
+  text-shadow:0 0 2rem color-mix(in srgb, var(--brand) 55%, transparent);
+}
+.hero__en{
+  margin-top:.55rem;
+  font-family:"Oswald",sans-serif;font-weight:400;
+  font-size:1.35rem;letter-spacing:.30em;color:var(--ink-2);
+}
+.hero__tag{
+  margin-top:.85rem;
+  display:flex;align-items:center;gap:.55rem;
+  font-size:1.06rem;font-weight:500;letter-spacing:.14em;color:var(--ink-2);
+}
+.tick{
+  width:.34rem;height:1.05rem;flex:none;border-radius:.2rem;
+  background:var(--brand);
+  box-shadow:0 0 .8rem color-mix(in srgb, var(--brand) 70%, transparent);
+}
+
+/* =========================================================
+   中段：模型舞台 + 倒數
+   ========================================================= */
+.mid{
+  flex:1;min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 27rem;
+  gap:2rem;align-items:stretch;
+}
+
+/* ---------- 3D 舞台（無外框，直接融進背景） ---------- */
+.stage{position:relative;overflow:hidden}
+.stage canvas{display:block;width:100%!important;height:100%!important}
+.stage.is-drop{box-shadow:inset 0 0 0 1px var(--brand-hi),inset 0 0 5rem var(--brand-soft)}
+
+.stage__label{
+  position:absolute;top:.85rem;left:1rem;z-index:3;pointer-events:none;
+  font-family:"Oswald",sans-serif;font-size:.72rem;letter-spacing:.24em;
+  color:var(--ink-3);
+}
+.stage__hint{
+  position:absolute;bottom:.85rem;right:1rem;z-index:3;pointer-events:none;
+  font-size:.72rem;letter-spacing:.06em;color:var(--ink-3);text-align:right;
+  transition:opacity .3s;
+}
+.stage__hint b{color:var(--ink-2);font-weight:500}
+.stage__loading{
+  position:absolute;inset:auto 0 50% 0;z-index:4;text-align:center;
+  font-family:"Oswald",sans-serif;letter-spacing:.2em;font-size:.9rem;color:var(--brand-hi);
+}
+.legend{
+  position:absolute;left:1rem;bottom:.85rem;z-index:3;list-style:none;pointer-events:none;
+  display:flex;flex-direction:column;gap:.4rem;align-items:flex-start;
+}
+.legend li{display:flex;align-items:center;gap:.45rem;font-size:.72rem;color:var(--ink-3);letter-spacing:.08em}
+.dot{width:.45rem;height:.45rem;border-radius:50%}
+.dot--red{background:var(--red);box-shadow:0 0 .7rem var(--red)}
+.dot--green{background:var(--exit);box-shadow:0 0 .7rem var(--exit)}
+
+/* ---------- 倒數面板 ---------- */
+/* data-stage 由 countdown.js 跟著剩餘秒數切換，整組圓盤共用這個 --hot */
+.timer{
+  --hot:var(--stage-0);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1rem;min-height:0;
+}
+.timer[data-stage="1"]{--hot:var(--stage-1)}
+.timer[data-stage="2"]{--hot:var(--stage-2)}
+.timer__ring{position:relative;width:100%;max-width:25rem;aspect-ratio:1;cursor:pointer}
+
+.ring{width:100%;height:100%;overflow:visible}
+.ring__track{fill:none;stroke:var(--brand-soft);stroke-width:1}
+.ring__track--in{stroke:var(--brand-soft);opacity:.6}
+.ring__ticks line{
+  stroke:var(--brand-soft);stroke-width:6;stroke-linecap:round;
+  transition:stroke .18s linear;
+}
+.ring__ticks line.on{stroke:var(--hot)}
+.ring__head{
+  fill:var(--hot);filter:drop-shadow(0 0 .5rem var(--hot));
+  transition:fill .3s var(--ease);
+}
+
+/* ---------- 內圈的彗星尾光帶（一秒一圈） ---------- */
+.comet{
+  --r:.34rem;                      /* 光帶粗細 */
+  position:absolute;left:50%;top:50%;
+  width:59%;aspect-ratio:1;        /* 對齊 viewBox 裡 r=118 的內圈 */
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  /* 光暈打在外層，才會套在「已經遮罩過」的環上而不是整個圓盤 */
+  filter:drop-shadow(0 0 .42rem color-mix(in srgb, var(--hot) 75%, transparent));
+  transition:filter .3s var(--ease);
+}
+.comet i{
+  position:absolute;inset:0;border-radius:50%;
+  /* 逆時針跑，所以頭放在 0°（正上方）、尾巴往順時針方向拖，頭才會在前面 */
+  background:conic-gradient(from -90deg,
+    #fff 0deg,
+    var(--hot) 7deg,
+    color-mix(in srgb, var(--hot) 85%, transparent) 22deg,
+    color-mix(in srgb, var(--hot) 50%, transparent) 62deg,
+    color-mix(in srgb, var(--hot) 20%, transparent) 122deg,
+    transparent 190deg,
+    transparent 360deg);
+  /* 只留最外緣一圈，中間挖空 */
+  -webkit-mask:radial-gradient(closest-side, #0000 calc(100% - var(--r)), #000 calc(100% - var(--r)));
+  mask:radial-gradient(closest-side, #0000 calc(100% - var(--r)), #000 calc(100% - var(--r)));
+  animation:cometSpin 2s linear infinite;
+}
+@keyframes cometSpin{ from{rotate:0deg} to{rotate:-360deg} }   /* 負角度＝逆時針 */
+
+@media (prefers-reduced-motion:reduce){ .comet i{animation:none} }
+
+.timer__center{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;
+  pointer-events:none;
+}
+.timer__value{
+  display:flex;align-items:baseline;
+  font-family:"Oswald",sans-serif;font-weight:500;
+  font-size:8.4rem;line-height:.82;color:var(--hot);
+  text-shadow:0 0 3.4rem color-mix(in srgb, var(--hot) 60%, transparent);
+  transition:color .3s var(--ease), text-shadow .3s var(--ease);
+}
+/* 最後 5 秒（.is-urgent 由 countdown.js 掛上） */
+.timer.is-urgent .timer__value{animation:urgentBlink 1s ease-in-out infinite}
+@keyframes urgentBlink{
+  0%,100%{opacity:1;text-shadow:0 0 3.4rem color-mix(in srgb, var(--hot) 60%, transparent)}
+  50%{opacity:.22;text-shadow:0 0 1rem color-mix(in srgb, var(--hot) 25%, transparent)}
+}
+@media (prefers-reduced-motion:reduce){ .timer.is-urgent .timer__value{animation:none} }
+.timer__value i{
+  font-style:normal;font-family:"Noto Sans TC",sans-serif;font-size:.24em;font-weight:700;
+  margin-left:.12em;color:var(--hot);transition:color .3s var(--ease);
+}
+.timer__caption{
+  font-size:.92rem;letter-spacing:.34em;color:var(--hot);padding-left:.34em;
+  transition:color .3s var(--ease);
+}
+.timer__foot{font-size:1.02rem;font-weight:500;letter-spacing:.1em;color:var(--ink-2)}
+.timer__foot b{
+  color:var(--hot);font-family:"Oswald",sans-serif;font-weight:500;font-size:1.16em;
+  transition:color .3s var(--ease);
+}
+
+/* =========================================================
+   正確應對
+   ========================================================= */
+.acts{grid-area:acts;display:flex;flex-direction:column;gap:.8rem}
+.acts__title{
+  display:flex;align-items:center;gap:.55rem;
+  font-size:1.12rem;font-weight:600;letter-spacing:.12em;color:var(--ink);
+}
+/* 四格置中成一排，不再撐滿整欄 */
+.acts__list{
+  list-style:none;display:grid;grid-template-columns:repeat(4,15rem);
+  gap:.9rem;justify-content:center;
+}
+.act{
+  --ch:.5rem;
+  display:flex;flex-direction:column;align-items:center;gap:.3rem;
+  padding:1.15rem .6rem 1rem;
+}
+.act:hover{--bw:.75px}
+.act__ico{width:3.1rem;height:3.1rem;margin-bottom:.35rem;color:var(--brand-hi)}
+.act__ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.25;stroke-linecap:round;stroke-linejoin:round}
+.act b{font-size:.9rem;font-weight:700;letter-spacing:.1em}
+.act__sub{font-size:.7rem;color:var(--ink-3);letter-spacing:.04em}
+
+/* =========================================================
+   右欄
+   ========================================================= */
+.side-head{flex:none;text-align:right;padding-top:.4rem}
+.side-head h2{
+  font-size:1.62rem;font-weight:700;letter-spacing:.06em;color:var(--brand-hi);
+  text-shadow:0 0 1.6rem color-mix(in srgb, var(--brand) 40%, transparent);
+}
+.side-head p{margin-top:.5rem;font-size:.8rem;line-height:1.6;color:var(--ink-3);letter-spacing:.06em}
+
+/* 第一頁標題「30」與「每一秒都很關鍵」跟著倒數時段換色（藍→黃→紅，與圓盤／3D 逃生點同步）
+   data-stage 由 main.js 的 onPhase 掛在 .page--main 上 */
+.hero__num,.side-head h2{transition:color .4s var(--ease),text-shadow .4s var(--ease)}
+.page--main[data-stage="0"] .hero__num,.page--main[data-stage="0"] .side-head h2{color:var(--stage-0)}
+.page--main[data-stage="1"] .hero__num,.page--main[data-stage="1"] .side-head h2{color:var(--stage-1)}
+.page--main[data-stage="2"] .hero__num,.page--main[data-stage="2"] .side-head h2{color:var(--stage-2)}
+.page--main[data-stage] .hero__num,
+.page--main[data-stage] .side-head h2{text-shadow:0 0 1.6rem color-mix(in srgb, currentColor 45%, transparent)}
+
+.phases{list-style:none;flex:1;min-height:0;display:flex;flex-direction:column;gap:1.1rem;justify-content:center}
+.phase{
+  --ch:.7rem;
+  --bw:.5px;
+  /* 細框 + 薄玻璃：一層很淡的高光漸層再加背景模糊 */
+  --glass:linear-gradient(155deg,
+    rgba(255,255,255,.065) 0%, rgba(255,255,255,.012) 48%, rgba(255,255,255,.038) 100%);
+  --stroke:linear-gradient(140deg,
+    color-mix(in srgb, var(--brand-hi) 95%, transparent) 0%,
+    color-mix(in srgb, var(--brand) 62%, transparent) 34%,
+    color-mix(in srgb, var(--brand) 36%, transparent) 66%,
+    color-mix(in srgb, var(--brand) 62%, transparent) 100%);
+
+  display:flex;align-items:center;gap:1rem;
+  padding:1.15rem 1.1rem;
+  /* 用 translate 而非 transform，才不會和編輯模式的 scale() 打架 */
+  transition:translate .3s var(--ease);
+}
+.phase::before{backdrop-filter:blur(7px)}
+.phase::after{transition:filter .3s var(--ease)}
+
+/* 每一段的專屬亮色 */
+.phase[data-phase="0"]{--hot:var(--stage-0)}
+.phase[data-phase="1"]{--hot:var(--stage-1)}
+.phase[data-phase="2"]{--hot:var(--stage-2)}
+.phase__ico{
+  flex:none;width:3.2rem;height:3.2rem;border-radius:50%;
+  display:grid;place-items:center;
+  border:1px solid color-mix(in srgb, var(--brand) 34%, transparent);
+  background:rgba(0,0,0,.35);
+  color:var(--brand);
+  transition:color .3s, border-color .3s, box-shadow .3s, background .3s;
+}
+.phase__ico svg{width:1.7rem;height:1.7rem;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.phase__body{min-width:0}
+.phase__t{
+  display:block;font-family:"Oswald",sans-serif;font-weight:500;
+  font-size:1.55rem;line-height:1;color:var(--brand-hi);letter-spacing:.02em;
+  transition:color .3s var(--ease), text-shadow .3s var(--ease);
+}
+.phase__t i{font-style:normal;font-family:"Noto Sans TC",sans-serif;font-size:.58em;font-weight:700;margin-left:.18em}
+.phase__d{
+  margin-top:.45rem;font-size:.78rem;line-height:1.55;color:var(--ink-3);letter-spacing:.03em;
+  transition:color .3s var(--ease);
+}
+
+/* 輪到這一段：框線換成該段的亮色並微微加粗，圓形 Icon 同步亮起 */
+.phase.is-on{
+  --bw:.75px;
+  --stroke:linear-gradient(140deg,
+    var(--hot) 0%, color-mix(in srgb, var(--hot) 52%, transparent) 48%, var(--hot) 100%);
+  --glass:linear-gradient(155deg,
+    color-mix(in srgb, var(--hot) 10%, rgba(255,255,255,.055)) 0%,
+    rgba(255,255,255,.018) 50%,
+    color-mix(in srgb, var(--hot) 7%, rgba(255,255,255,.03)) 100%);
+  translate:-.35rem 0;
+}
+/* 光暈直接打在框線那層，只有框會發光 */
+.phase.is-on::after{
+  filter:drop-shadow(0 0 .45rem color-mix(in srgb, var(--hot) 55%, transparent));
+}
+.phase.is-on .phase__ico{
+  color:var(--hot);
+  border-color:var(--hot);
+  background:color-mix(in srgb, var(--hot) 14%, rgba(0,0,0,.4));
+  box-shadow:0 0 .9rem color-mix(in srgb, var(--hot) 45%, transparent),
+             inset 0 0 .7rem color-mix(in srgb, var(--hot) 20%, transparent);
+}
+/* 文字也跟著換色：標題整個變該段的顏色，說明文字混一點色調並提亮 */
+.phase.is-on .phase__t{
+  color:var(--hot);
+  text-shadow:0 0 1rem color-mix(in srgb, var(--hot) 40%, transparent);
+}
+.phase.is-on .phase__d{color:color-mix(in srgb, var(--hot) 42%, var(--ink))}
+
+/* =========================================================
+   底部警語
+   ========================================================= */
+.warn{
+  --ch:.5rem;
+  --stroke:linear-gradient(90deg,
+    rgba(255,180,46,.12) 0%, rgba(255,180,46,.7) 50%, rgba(255,180,46,.12) 100%);
+  z-index:2;flex:none;margin-top:1.1rem;
+  display:flex;align-items:center;justify-content:center;gap:.7rem;
+  padding:.62rem 1rem;
+  font-size:.92rem;font-weight:500;letter-spacing:.2em;color:var(--amber);
+}
+.warn__ico{width:1.15rem;height:1.15rem}
+.warn__ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+
+/* =========================================================
+   首頁（ENTER）
+   ========================================================= */
+.page--home{
+  display:flex;flex-direction:column;
+  /* 下方留白跟 .page--main 一樣，右下標語才會和第一頁的「火災無情」同高 */
+  padding:2.4rem 2.8rem 1.1rem;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(80% 70% at 40% 55%, var(--glow-2), transparent 70%),
+    linear-gradient(170deg, var(--bg-1) 0%, var(--bg-0) 65%);
+}
+
+.home{
+  position:relative;z-index:2;
+  flex:1;min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 27rem;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:
+    "brand brand"
+    "stage panel"
+    "foot  foot";
+  gap:1.4rem 2.6rem;
+}
+
+/* ---------- 標題 ---------- */
+/* 「雲端宅邸」永遠壓在 3D 之上。舞台被放大到蓋住整個畫面之後，
+   標題和 canvas 是重疊的，而 .home__stage 有 position:relative、DOM 又排在標題後面，
+   不指定層級的話模型和煙霧會擋在字前面。
+   .home 自己有 z-index:2、是一個獨立的堆疊環境，所以這個數字只跟舞台裡那幾層比：
+   黑幕 2 ／ 舞台標籤 3 ／ 載入中 4 ／ 恭喜通關 5，取 6 就都在上面。
+   其他版面元素（按鈕、功能鍵、標語）要一起浮上來的話，比照加 position:relative + z-index。 */
+.home__brand{grid-area:brand;display:flex;align-items:center;gap:1rem;position:relative;z-index:6}
+.home__mark{width:3.6rem;height:3.6rem;flex:none;color:var(--brand-hi)}
+.home__mark svg{
+  width:100%;height:100%;fill:none;stroke:currentColor;
+  stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 .7rem color-mix(in srgb, var(--brand) 45%, transparent));
+}
+/* 字級跟第一頁的 .hero__zh 對齊 */
+.home__name{
+  font-size:3.5rem;font-weight:700;letter-spacing:.06em;line-height:1;
+  text-shadow:0 0 2.4rem var(--brand-soft);
+}
+
+/* =========================================================
+   前言頁（PAGE 0，按 I 回來）
+   開機看到的第一頁，停 INTRO_HOLD 秒後自動進「火災黃金30秒」；
+   按任何切頁鍵（Enter / Esc / B / I）都會取消自動跳頁。
+   整頁是**置中的一欄**（不是絕對定位），所以換視窗尺寸不會散掉；
+   細部位置一樣可以進編輯模式（E）調，存在 layout-intro.json。
+   ========================================================= */
+/* ⚠️ .intro__* 是**前言頁和結語頁共用**的一套樣式，不是只有前言在用。
+   兩頁的字級／字距／顏色／平面圖大小完全一樣，只有文案和 data-obj 不同
+   （版面各自存檔：layout-intro.json / layout-outro.json）。 */
+.page--intro,
+.page--outro{
+  display:flex;align-items:center;justify-content:center;
+  padding:2.2rem 2.6rem;
+  /* 底圖：跟另外兩頁同一組 --glow，但**光心放在畫面中間**（那兩頁是從上緣打下來的），
+     再用最底下那層由上到下的漸層讓上下兩端沉下去 */
+  background:
+    /* 第一層 = 暈影，四周壓暗。稿子的邊角比中間深很多，少了這一層整片會很平。
+       ⚠️ **一定要做成 background 的一層，不要另外開一個 ::before**：
+          多一層定位元素就得給 .intro__body 加 position:relative，
+          那會讓它變成子物件的 offsetParent，**編輯模式存的座標基準就整個換掉**，
+          舊的 layout-intro.json 會整批跑位。背景層本來就畫在所有內容底下，不用碰定位。 */
+    radial-gradient(118% 88% at 50% 46%,
+      transparent 42%,
+      color-mix(in srgb, var(--bg-0) 78%, transparent) 78%,
+      var(--bg-0) 100%),
+    radial-gradient(115% 85% at 50% 44%, var(--glow-1), transparent 62%),
+    radial-gradient(70% 55% at 50% 30%, var(--glow-2), transparent 72%),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 46%, var(--bg-0) 100%);
+}
+.intro__body{
+  display:flex;flex-direction:column;align-items:center;
+  width:100%;max-width:76rem;
+}
+
+/* ---------- 四角的 HUD 框角 ---------- */
+.intro__corner{
+  position:absolute;width:3.2rem;height:3.2rem;pointer-events:none;
+  /* 比 --brand-line 濃一點 —— 那支太淡，在投影機／縮圖上會整個消失 */
+  border:1px solid color-mix(in srgb, var(--brand) 55%, transparent);
+}
+.intro__corner--tl{top:1.6rem;left:1.9rem;border-right:0;border-bottom:0}
+.intro__corner--tr{top:1.6rem;right:1.9rem;border-left:0;border-bottom:0}
+.intro__corner--bl{bottom:1.6rem;left:1.9rem;border-right:0;border-top:0}
+.intro__corner--br{bottom:1.6rem;right:1.9rem;border-left:0;border-top:0}
+
+/* 底部一排長短不一的刻度：兩層 repeating-linear-gradient 疊出「不規則」的感覺
+   （單一層的話會是完全等距，看起來像進度條不像儀表） */
+.intro__ticks{
+  position:absolute;left:50%;bottom:2.4rem;transform:translateX(-50%);
+  width:22rem;height:.55rem;pointer-events:none;opacity:.55;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--brand-line) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(90deg,
+      color-mix(in srgb, var(--brand) 30%, transparent) 0 1px, transparent 1px 23px);
+  -webkit-mask-image:linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  mask-image:linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+}
+
+/* ---------- 前言 · INTRO ---------- */
+.intro__eyebrow{
+  display:flex;align-items:center;justify-content:center;gap:1.5rem;
+  width:100%;
+}
+.intro__rule{flex:1;max-width:11rem;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb, var(--brand) 55%, transparent))}
+.intro__rule + .intro__chip + .intro__rule{background:linear-gradient(90deg,color-mix(in srgb, var(--brand) 55%, transparent),transparent)}
+/* 標籤外面那個上下開口的方框：用 ::before / ::after 各畫一組左右角 */
+.intro__chip{
+  position:relative;flex:none;
+  padding:.68rem 2.6rem;
+  font-size:1.2rem;font-weight:500;letter-spacing:.26em;
+  color:var(--brand-hi);
+  text-shadow:0 0 1.4rem color-mix(in srgb, var(--brand) 45%, transparent);
+}
+.intro__chip::before,.intro__chip::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  border:1px solid color-mix(in srgb, var(--brand) 55%, transparent);
+}
+.intro__chip::before{border-bottom:0;                /* 上半：只留左右上三邊，中間切掉 */
+  -webkit-mask-image:linear-gradient(90deg,#000 0 22%,transparent 22% 78%,#000 78% 100%);
+  mask-image:linear-gradient(90deg,#000 0 22%,transparent 22% 78%,#000 78% 100%);
+}
+.intro__chip::after{border-top:0;
+  -webkit-mask-image:linear-gradient(90deg,#000 0 22%,transparent 22% 78%,#000 78% 100%);
+  mask-image:linear-gradient(90deg,#000 0 22%,transparent 22% 78%,#000 78% 100%);
+}
+
+/* ---------- 主標 ---------- */
+/* 字級／行距／間距都是照設計稿量出來的（稿是 1673px 寬，換算到 1920 要 ×1.1476） */
+.intro__title{
+  margin-top:4.4rem;
+  font-size:5.1rem;font-weight:700;line-height:1.3;letter-spacing:.06em;
+  text-align:center;color:var(--brand-hi);
+  /* 一整句排一行、不換行，三段之間空一格。
+     三段各自包在 <span> / <em> 裡，就是 flex 的三個 item：**中間那段（每一秒）維持原字級，
+     左右兩段用 em 相對縮小**，所以改主標字級時三段會一起等比縮放。
+     要三段之間留空隙就在這裡加 gap（一個數字說了算，不要打全形空白 —— 會受字距影響）。
+     編輯模式凍結之後這個框有固定高度（原本是兩行的高），所以 align-items:center
+     讓單行**在框裡垂直置中**，不然字會貼在框的上緣。
+     ⚠️ 之後如果要改回兩行（加回 <br>），要先把 flex 這幾行拿掉。 */
+  white-space:nowrap;
+  display:flex;align-items:center;justify-content:center;
+  text-shadow:0 0 3rem var(--brand-soft);
+}
+/* 三段大小不一樣，所以**要對齊基線（視覺上就是對齊底部）**，不能用置中 ——
+   置中的話小字會浮在大字的中間，看起來像沒對齊。
+   ⚠️ 為什麼要多包一層 .intro__title-row：外層那個 flex 負責「單行在固定高度的框裡垂直置中」，
+      而單行 flex 容器沒辦法同時做「整行置中」和「item 對齊基線」（align-content 對單行無效，
+      直接把外層改成 baseline 會讓整行貼到框的上緣）。所以分兩層：外層置中、內層對基線。 */
+.intro__title-row{display:flex;align-items:baseline}
+/* 整句都是主色。<em>（「每一秒」）維持主標的字級，左右兩段縮小 —— 用 em 是相對值，
+   改上面的 font-size 三段會一起等比縮放，不用兩邊都改。 */
+.intro__title em{font-style:normal;color:inherit}
+.intro__title-row > span{font-size:.7em}
+
+.intro__lead{
+  margin-top:4.6rem;
+  font-size:1.9rem;font-weight:400;letter-spacing:.08em;color:var(--ink-2);
+  text-align:center;
+}
+
+/* ---------- 平面圖（3D flat 場景，壓得很淡當底圖） ---------- */
+/* 大小就是編輯模式裡 introPlan 這個框的大小 —— 3D 會照框的短邊去框景，
+   所以想讓平面圖更大就把框「加高」（不是加寬）。 */
+.intro__plan{
+  position:relative;
+  margin-top:2.4rem;
+  width:50rem;height:20rem;
+}
+/* ⚠️ 平面圖的壓淡**不在這裡做**，這裡放 opacity 會連逃生動線一起壓掉
+      （建物和動線畫在同一張 canvas 上），而且會變成亮度的硬上限。
+      改在 3D 那邊把 veil 夾在建物和動線中間：js/main.js 的 PLAN_DIM → viewer.setPlanDim()。 */
+/* 紅色起火點：純 CSS，不動 3D。像雷達鎖定的靶心 —— 實心核心 + 兩圈細環 + 十字準星 + 外圈暈光。
+   **位置不是寫死的**：js/main.js 的 placeIntroSpark() 會把隨機一條逃生動線的起點投影下來，
+   算成 --sx / --sy（相對平面圖框的百分比）寫進來。整顆的大小用 --spark 一個數字縮放，
+   環和十字都是 --spark 的倍數，所以改一個數字就整組等比放大。
+   ⚠️ 環是用 ::before 的**放射漸層**畫的，不是 border —— 一層漸層就能畫兩圈粗細顏色不同的環，
+      中間留空才看得到底下的平面圖。漸層要寫 `closest-side`，
+      不然預設的 farthest-corner 會把 100% 算到方框的**角**（×1.414），百分比就對不上了。
+   ⚠️ 十字用 ::after 的兩條線性漸層，**中間留一段空**讓實心核心露出來 ——
+      ::before / ::after 都畫在元素背景之上，不留空的話線會壓過核心。 */
+.intro__spark{
+  --sx:50%; --sy:66%;
+  --spark:.8rem;                           /* 核心直徑，環和十字會跟著等比放大 */
+  position:absolute;left:var(--sx);top:var(--sy);transform:translate(-50%,-50%);
+  width:var(--spark);height:var(--spark);border-radius:50%;
+  /* 亮度只加在**顏色和濃度**上，不加在尺寸上：
+     --red 是 rgb(255,74,61)，紅色通道已經滿了，要再亮只能把另外兩個通道抬一點
+     （往橘紅走、不是往白走 —— 中心不要出現白點）。
+     ⚠️ **不要用 box-shadow 的擴散值（第 3 個數字）來加亮** —— 那會讓核心實際變大，
+        外擴的光還會壓到內環上，看起來像整組都變了。三層光暈的半徑維持原本的 1.1 / 3.4 / 7rem，
+        只把濃度拉高。 */
+  background:color-mix(in srgb, var(--red) 86%, #fff);
+  box-shadow:
+    0 0 1.1rem var(--red),
+    0 0 3.4rem color-mix(in srgb, var(--red) 78%, transparent),
+    0 0 7rem   color-mix(in srgb, var(--red) 46%, transparent);
+  animation:introSpark 2.4s ease-in-out infinite;
+}
+/* 兩圈同心環。500% = 核心的 5 倍寬，closest-side 讓漸層的 100% = 半徑 = 2.5 個核心直徑，
+   所以「內環半徑 1.13 個核心直徑」= 45.2%、「外環 1.68」= 67.2%。 */
+.intro__spark::before{
+  content:"";position:absolute;left:50%;top:50%;
+  width:500%;height:500%;transform:translate(-50%,-50%);
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle closest-side,
+    transparent 0 43.9%,
+    var(--red) 43.9% 46.5%,      /* 內環 */
+    transparent 46.5% 66.1%,
+    var(--red) 66.1% 68.3%,      /* 外環 */
+    transparent 68.3%);
+  filter:drop-shadow(0 0 .25rem color-mix(in srgb, var(--red) 70%, transparent));
+  animation:introSparkRing 2.4s ease-in-out infinite;
+}
+/* 十字準星：橫線 + 直線。長度 400% ＝ 從中心往外 2.0 個核心直徑，外環是 1.68，
+   所以只比外環多伸出去一點點（原本 560% 太長了）。中間留空給核心。 */
+.intro__spark::after{
+  content:"";position:absolute;left:50%;top:50%;
+  width:400%;height:400%;transform:translate(-50%,-50%);
+  pointer-events:none;
+  --xh:calc(var(--spark) * .075);          /* 線的粗細 */
+  background:
+    linear-gradient(90deg,
+      var(--red) 0 37.5%, transparent 37.5% 62.5%, var(--red) 62.5% 100%) center / 100% var(--xh) no-repeat,
+    linear-gradient(180deg,
+      var(--red) 0 37.5%, transparent 37.5% 62.5%, var(--red) 62.5% 100%) center / var(--xh) 100% no-repeat;
+  filter:drop-shadow(0 0 .2rem color-mix(in srgb, var(--red) 60%, transparent));
+  animation:introSparkRing 2.4s ease-in-out infinite;
+}
+/* 紅點跟著輪播文字的三段換狀態，class 由 js/main.js 跟著同一個計時器掛上：
+     第 1 段（主標）  .is-big  —— 放大
+     第 2 段（副標）  無       —— 一般大小
+     第 3 段（結語）  .is-fade —— **維持上一個點不換位置**，而且**把脈動換成淡出**：
+                                  這一段紅點還是看得到的，只是從全亮線性淡掉，不再一閃一閃。
+   ⚠️ 淡出是**換一支動畫**（introSparkFade）不是用 transition —— 用 transition 的話
+      起點是「當下脈動到哪」，每次淡出的亮度都不一樣；換動畫才保證每次都從全亮開始。
+      forwards 讓它停在透明，直到 class 被拿掉。長度 --fade 比一段的 5 秒短一點，收乾淨再換下一輪。
+      淡完之後回到第 1 段是**直接跳出來**的（脈動重新接手），像感測器重新鎖定。
+   ⚠️ 放大是改 --spark（帶動 width/height），不是動 transform —— transform 被脈動動畫佔走了。
+      **--spark 一定要先用 @property 註冊成 <length>**，不然：
+        1. 沒註冊的自訂屬性不能 transition
+        2. 而且只要 width 上掛了 transition，var() 算出來的值會卡住不更新
+           （實測：--spark 變成 1.15rem 了，width 還是停在 .8rem 對應的 10.66px；
+            把 transition 拿掉才會跳成 15.33px）
+      註冊之後直接 transition --spark 本身，width/height 就會跟著平滑長大。 */
+@property --spark{ syntax:"<length>"; inherits:true; initial-value:1rem }
+.intro__spark{
+  --fade:4.6s;
+  transition:opacity .45s var(--ease), --spark .5s var(--ease);
+}
+.intro__spark.is-big{--spark:1.15rem}
+.intro__spark.is-fade{
+  transition:--spark .5s var(--ease);
+}
+.intro__spark.is-fade,
+.intro__spark.is-fade::before,
+.intro__spark.is-fade::after{
+  animation:introSparkFade var(--fade) linear forwards;
+}
+@keyframes introSparkFade{
+  from{ opacity:1 }
+  to  { opacity:0 }
+}
+
+@keyframes introSpark{
+  0%,100%{ transform:translate(-50%,-50%) scale(1);    opacity:1 }
+  50%    { transform:translate(-50%,-50%) scale(.82);  opacity:.72 }
+}
+/* 環和十字的呼吸跟核心反相：核心縮的時候往外推一點，看起來像一波一波送出去 */
+@keyframes introSparkRing{
+  0%,100%{ transform:translate(-50%,-50%) scale(1);    opacity:.9 }
+  50%    { transform:translate(-50%,-50%) scale(1.12); opacity:.6 }
+}
+
+/* ---------- 結語 ---------- */
+.intro__sign{
+  margin-top:2.6rem;
+  /* 這行 14 個字實測 寬度 ≈ 字級 ×(12.18 + 12.17 × 字距)
+     （「，」「。」比全形窄，字距的段數也不是整數，所以係數是量出來的不是算出來的）。
+     沿革：2.25rem/.1em（30.15rem 寬）→ 1.95rem/.27em（同寬）→ 1.3rem/.27em（再小 1/3，窄成 21.2rem）
+     → **1.3rem/.55em（字距加倍，回到約 24.5rem 寬）**。
+     要讓它回到最早的 30.15rem 寬的話，用上面那條式子回推是 .9em（會開到快一個全形空白）。 */
+  /* 顏色跟主標同一支 --brand-hi，**深淺改用透明度**（不是換色票）——
+     深色底上降透明度就是往背景沉下去，結語才不會跟主標搶。 */
+  font-size:1.3rem;font-weight:400;letter-spacing:.55em;color:var(--brand-hi);
+  /* 一點點光暈。⚠️ opacity 會**連 text-shadow 一起壓**，所以濃度要抓得比看起來需要的高一點
+     （55% × .7 ≈ 實際 38%）。要更亮就加濃度，要更散就加那個 .9rem。 */
+  text-shadow:0 0 .9rem color-mix(in srgb, var(--brand-hi) 55%, transparent);
+  opacity:.7;
+  text-align:center;
+}
+/* 整句都是主色。<b>（「寶舖」）保留著，之後想讓品牌名跳出來改這一行就好 */
+.intro__sign b{font-weight:inherit;color:inherit}
+
+@media (prefers-reduced-motion:reduce){
+  .intro__spark,.intro__spark::before,.intro__spark::after{animation:none}
+}
+
+/* ---------- 三段文字疊在同一個位置往上滾動輪替（前言頁和結語頁都用） ----------
+   文字本身完全沿用 .intro__title / .intro__lead / .intro__sign（字級字距顏色都沒動），
+   只是**全部搬到主標的位置**、絕對定位疊在一起，用同一支動畫錯開時間輪流出現。
+   ⚠️ 三段共用一支 keyframes，靠 **negative animation-delay** 錯開，
+      所以「幾秒換一段」只有 --roll 一個數字要改，段數變了也只要改 nth-child 的延遲。
+   ⚠️ **不要用 overflow:hidden 裁上下** —— 它會連左右一起裁，主標是 white-space:nowrap、
+      常常比這個框寬，會被切掉。改用 clip-path 只裁上下、左右放開。
+   ⚠️ 三段本來在編輯模式裡是各自獨立的物件、各有各的縮放；併成一個框之後三段共用框的縮放，
+      所以用 --lead-k / --sign-k 把原本的比例補回來（不補的話結語會小掉快三成）。 */
+.intro__roll{
+  --roll:5s;                               /* 每一段停留幾秒（跟紅點換點的 INTRO_SPARK_EVERY 對齊） */
+  --lead-k:1; --sign-k:1;                  /* 併框之後補回原本的相對字級（見上） */
+  position:relative;
+  clip-path:inset(0 -100vw);               /* 只裁上下，左右不裁 */
+  margin-top:4.4rem;                       /* 跟原本主標接在標籤下面的間距一樣 */
+  width:100%;height:9rem;                  /* 裝得下最高的那一段（主標約 6.6rem）+ 光暈 */
+}
+.intro__roll > *{
+  position:absolute;inset:0;margin:0;
+  /* flex-end = **三段都貼著框的底部**，字級不一樣也不會上下跳動 */
+  display:flex;align-items:flex-end;justify-content:center;
+  animation:introRoll calc(var(--roll) * 3) var(--ease) infinite;
+}
+.intro__roll > *:nth-child(2){animation-delay:calc(var(--roll) * -2)}
+.intro__roll > *:nth-child(3){animation-delay:calc(var(--roll) * -1)}
+.intro__roll .intro__lead{font-size:calc(1.9rem * var(--lead-k))}
+/* ⚠️ 結語那段原本是用 opacity:.7 壓淡的，但動畫本身要動 opacity（會蓋掉它），
+   所以這裡改成把濃度做進顏色裡，效果一樣、opacity 就空出來給動畫用。 */
+.intro__roll .intro__sign{
+  font-size:calc(1.3rem * var(--sign-k));
+  opacity:1;
+  color:color-mix(in srgb, var(--brand-hi) 70%, transparent);
+  text-shadow:0 0 .9rem color-mix(in srgb, var(--brand-hi) 38%, transparent);
+}
+/* 前言頁的三段原本各自縮放過（主標 .822 / 副標 .807 / 結語 1.133），
+   併成一個框之後統一吃主標的縮放，這兩個係數把另外兩段的字級補回原本看到的大小 */
+.page--intro .intro__roll{--lead-k:.981; --sign-k:1.3775}
+/* 一段的時間軸：從下面推上來 → 停著 → 往上推出去 → 在外面等下一輪 */
+@keyframes introRoll{
+  0%       { transform:translateY(60%);   opacity:0 }
+  5%       { transform:translateY(0);     opacity:1 }
+  28%      { transform:translateY(0);     opacity:1 }
+  33.333%  { transform:translateY(-60%);  opacity:0 }
+  100%     { transform:translateY(-60%);  opacity:0 }
+}
+@media (prefers-reduced-motion:reduce){
+  /* 不滾了就退回三段各自排在上下 */
+  .intro__roll{height:auto;clip-path:none}
+  .intro__roll > *{position:relative;inset:auto;animation:none;opacity:1;transform:none}
+  .intro__roll .intro__lead{margin-top:4.6rem}
+  .intro__roll .intro__sign{margin-top:2.6rem}
+}
+
+/* ANLB 字標：assets/anlb-neon.png（透明背景，霓虹光暈已經烘在圖裡，不需要 CSS 再加光）。
+   ⚠️ 圖是 1942×809，但**亮線只佔中間 90.7% 寬 / 42.8% 高**，四周是光暈的留白。
+      所以框要照整張圖的比例（1942/809 = 2.4），字才不會被切到光暈；
+      「字看起來多寬」= 框寬 × 0.907。換圖的話這兩個數字要重量。
+   ⚠️ 這張圖的藍是烘死的，**不跟著主題色變**（之前那版是用遮罩上色所以會跟著變）。
+      要跟著主題走就得回去用遮罩／向量那條路。 */
+.intro__logo{
+  --logo:14.4rem;                          /* 整張圖的寬；字標本身約是它的 90.7% */
+  position:absolute;left:50%;bottom:4.2rem;transform:translateX(-50%);
+  width:var(--logo);aspect-ratio:1942 / 809;
+  pointer-events:none;
+  opacity:.6;                              /* 角落的識別，壓淡一點不要跟內容搶 */
+  background:url(../assets/anlb-neon.png) center / contain no-repeat;
+}
+
+/* ---------- 3D 區 ---------- */
+.home__stage{grid-area:stage;min-width:0;min-height:0}
+
+/* ---------- 右上：標語 + 即時狀態面板 ----------
+   兩個都是**新增**的，沒有動到既有元素。
+   標語跟 .home__brand 同一個 grid 區（brand），靠 justify-self 推到右邊；
+   狀態面板跟 .home__route 同一個 grid 區（panel），一個貼上緣、一個置中，所以不會撞在一起。
+   位置和大小之後在編輯模式（E）用 homeTagline / homeStatus 兩個物件調。 */
+/* 右上是兩行：標語 + 小標。殼負責吃格線位置和靠右，
+   **字級也定在殼上**（.92rem）—— 小標用 em 掛在這個數字上，改標語字級小標會跟著等比縮放。
+   data-obj 掛在殼上，所以編輯模式（E）拖的是「兩行一起」。 */
+.home__head{
+  grid-area:brand;justify-self:end;align-self:center;
+  font-size:.92rem;text-align:right;
+}
+.home__tagline{
+  font-size:1em;font-weight:500;letter-spacing:.14em;color:var(--brand-hi);
+  padding-left:.14em;                      /* 補掉字距在尾端多出來的空白，看起來才是靠右對齊 */
+  white-space:nowrap;
+}
+/* 小標：比照第一頁右上「火勢與濃煙擴散極快…」（.side-head p）——
+   一樣的行高／字距／顏色，字級取**跟標題的比例**（.8rem ÷ 1.62rem ≈ .494），
+   不是照搬 .8rem：這一塊在版面上被放大到 3.5 倍，照搬會變成兩行一樣大、不像小標。 */
+.home__sub{
+  margin-top:.5rem;
+  font-size:.494em;line-height:1.6;letter-spacing:.06em;color:var(--ink-3);
+}
+/* × 比詞小一號；左右的間距**全部由 margin 控制**（index.html 那邊兩側已經沒有空白字元了），
+   要調寬窄改 margin 一個數字就好 */
+.home__tagline em{font-style:normal;opacity:.5;font-size:.72em;margin:0 .28em}
+/* 待機（藍）時三個詞每 5 秒依序亮起：即時感知紅 → 動態判斷黃 → 智慧分流綠。
+   沒輪到的維持 --brand-hi（藍）。紅／綠介面不跑這個，三個詞都是原本的顏色。
+   亮不亮由 js/main.js 掛 .is-on 決定，這裡只負責顏色。
+
+   顏色是純的語意色，**濃淡靠 opacity 漸強**：亮起的當下是 --lit（帶一點透明度，就是原本那個感覺），
+   到下一顆起火點出現前會慢慢拉滿到不透明。--tag-step 由 js/main.js 依 viewer.idleFirePeriod() 設定，
+   所以漸強的長度自動跟起火點的週期一樣長。
+   **換哪一個詞也是起火點在管**（不是自己的計時器），見 js/main.js 的 stepTagline()。 */
+.home__tagline{--lit:.6; --tag-step:4.75s}
+.home__tagline b{
+  font-weight:inherit;
+  transition:color .45s var(--ease), text-shadow .45s var(--ease);
+}
+.home__tagline b.is-on{
+  text-shadow:0 0 .7rem color-mix(in srgb, currentColor 55%, transparent);
+  /* class 是每次換詞時重新掛上去的，所以動畫會自動從頭跑一次；forwards 讓它停在最飽和的狀態 */
+  animation:taglineRamp var(--tag-step) linear forwards;
+}
+.home__tagline b:nth-of-type(1).is-on{color:var(--red)}
+.home__tagline b:nth-of-type(2).is-on{color:var(--amber)}
+.home__tagline b:nth-of-type(3).is-on{color:var(--exit)}
+/* 在「這一顆起火點的壽命」內把飽和度從 --lit 拉到滿 */
+@keyframes taglineRamp{
+  from { opacity:var(--lit) }
+  to   { opacity:1 }
+}
+@media (prefers-reduced-motion:reduce){
+  .home__tagline b.is-on{ animation:none; opacity:1 }
+}
+
+/* 四列包在**同一個**倒角框裡（不是四個各自的框），列與列之間用一條細分隔線 */
+.home__status{
+  grid-area:panel;align-self:start;
+  --ch:.6rem;
+  --tag:62%;              /* 右側小字的濃度：越小越淡（100% = 純的 --red / --exit） */
+  list-style:none;
+  padding:.3rem 1.05rem;
+}
+.home__status-item{
+  display:flex;align-items:center;gap:.85rem;
+  padding:.6rem 0;min-height:2.4rem;
+  color:var(--ink);
+}
+.home__status-item + .home__status-item{border-top:1px solid var(--brand-line)}
+.home__status-ico{width:1.4rem;height:1.4rem;flex:none;color:var(--brand-hi)}
+.home__status-ico svg{
+  width:100%;height:100%;fill:none;stroke:currentColor;
+  stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;
+}
+.home__status-item b{font-size:.95rem;font-weight:500;letter-spacing:.1em}
+/* 右側小字：綠＝安全（低風險／暢通）、紅＝要注意（已辨識／壅塞）。
+   兩個都是語意色（--exit / --red），**不隨主題變**，紅色介面下也還是綠的綠、紅的紅。
+   顏色**刻意調淡**（跟 transparent 混，色相不變、只是濃度降下來），不要跟主標題搶。
+   要更淡／更濃改上面的 --tag 一個數字就好。 */
+.home__status-item i{
+  margin-left:auto;
+  font-style:normal;font-size:.6rem;font-weight:500;letter-spacing:.1em;
+  color:var(--ink-3);
+  transition:color .35s var(--ease);       /* 通關時「已辨識」會換字換色，不要硬跳 */
+}
+.home__status-item i.is-ok{color:color-mix(in srgb, var(--exit) var(--tag), transparent)}
+.home__status-item i.is-alert{color:color-mix(in srgb, var(--red) var(--tag), transparent)}
+
+/* ---------- 兩顆「逃生動線」按鈕的雜訊抽動 ----------
+   **兩種風格混在一起**：
+     A（訊號壞掉）  真的疊一層雜訊：橫掃描線 + 顆粒 + 撕裂遮罩，一格一格硬跳，整體忽亮忽暗
+     B（橫向殘影）  框線／圖示／文字往右糊出去再收回來，圖示和文字還會真的位移
+   A 給「壞掉」的髒感，B 給「訊號被拉走」的動感，兩個同時發生才像映像管真的在抽。
+
+   **不是固定週期的循環**，而是走到時間軸的一個點就抽一次
+   （js/main.js 的 glitchBtn() 掛上 .is-glitch，跑完 one-shot 動畫再自己拿掉）。
+   一次 0.5 秒：衝出去 → 收 → 再衝一次（比較大）→ 收 → 小抖一下 → 乾淨。
+
+   誰在抽、什麼顏色，由 js/main.js 決定（同一組動畫）：
+     待機（藍）  → 「展示逃生動線」，節奏來自擺盪時間軸（onSwingBeat），
+                   快回到點 1 那幾秒改成跟綠樓梯同步（onStairBlink）
+     通關（綠）  → 「切換逃生動線」，節奏抄同一組拍長（swingBeatSeconds）
+   顏色不用切 —— 所有 keyframes 吃 --gl，而 --gl = --brand-hi，主題轉綠它就跟著綠。
+   **進場的第一拍都不抽**（藍是 skipGlitch，綠是第一拍先等一拍才開始）。
+
+   五層一起動：
+     .home__route-noise   雜訊層（routeNoise 忽隱忽現 + routeScan 掃描線跳捲 + routeTear 撕裂遮罩左右跳）
+     ::after              框線的殘影 + 整體提亮（routeBlink）
+     ::before             底光（routeBlinkFill）
+     .home__route-ico     圖示的殘影 + 位移 + 提亮（routeBlinkIco）
+     .home__route-label   文字的殘影 + 位移（routeBlinkTxt）
+
+   殘影是用 **drop-shadow 串**做的：drop-shadow 吃的是元素的 alpha 形狀，而框線畫在
+   .chamfer 的 ::after（clip-path 切出來的中空八邊形）上，所以影子會**完全照著倒角的形狀**跑，
+   不是一個矩形。串在一起的每一層都是「上一層結果」的影子，所以會疊成一條拖尾。
+
+   ⚠️ 每一格的 filter **函式數量要一模一樣**（現在是 5 個 drop-shadow + 1 個 brightness），
+      不然不會平滑內插、會變成硬跳；乾淨的那幾格用 drop-shadow(0 0 0 transparent) 補位。
+   ⚠️ **右邊的殘影推得比左邊遠、也比左邊濃**，位移也是右邊為主 —— 這就是「右邊更亮、左邊更暗」。
+   ⚠️ 雜訊層一定要有那層 **撕裂遮罩**（mask-image）：沒有它整條按鈕會一起亮，看起來很均勻、
+      不像壞掉的訊號。遮罩是寬 240% 的不規則橫向區塊，每一格跳到不同位置，
+      所以每一瞬間只有幾塊在閃、其他地方是乾淨的。
+   ⚠️ 掃描線的抖動放在 background-position **不要放 transform** —— transform 會把裁好的
+      倒角一起移出去，邊緣會露餡。
+   --stroke / --bw 那種自訂屬性沒辦法內插，不要想用它們做動畫。 */
+.home__route-btn{
+  /* 抽動的主色：直接吃主題色 —— 綠色介面的 --brand-hi 本來就是綠的（:root[data-theme="green"]），
+     所以「同一套動畫、藍的時候藍、綠的時候綠」，不用另外開一個綠色版本 */
+  --gl:var(--brand-hi);
+  --gl-soft:var(--brand);                  /* 底光和圖示光暈用的淡一號 */
+}
+
+/* ── A：雜訊層 ───────────────────────────────────────────
+   三層背景疊起來：兩組週期不一樣的橫條紋（11px / 29px，互相打拍就會很亂）
+   加一層 feTurbulence 的細顆粒。平常 opacity:0，抽動時才被 routeNoise 打開。
+   z-index:2 蓋在文字（.chamfer > * 的 z-index:1）和框線上面；
+   screen 混色所以只會提亮不會壓暗；clip-path 用 --shape 裁成倒角，不會溢出按鈕外面。 */
+.home__route-btn .home__route-noise{
+  position:absolute;inset:0;z-index:2;pointer-events:none;
+  opacity:0;
+  clip-path:var(--shape);
+  mix-blend-mode:screen;
+  background:
+    repeating-linear-gradient(0deg,
+      transparent 0px, transparent 1px,
+      rgba(255,255,255,.30) 1px, rgba(255,255,255,.30) 2px,
+      transparent 2px, transparent 4px,
+      color-mix(in srgb, var(--gl) 26%, transparent) 4px, color-mix(in srgb, var(--gl) 26%, transparent) 5px,
+      transparent 5px, transparent 7px,
+      rgba(255,255,255,.16) 7px, rgba(255,255,255,.16) 9px,
+      transparent 9px, transparent 11px),
+    repeating-linear-gradient(0deg,
+      transparent 0px, transparent 3px,
+      rgba(255,255,255,.12) 3px, rgba(255,255,255,.12) 4px,
+      transparent 4px, transparent 17px,
+      color-mix(in srgb, var(--gl) 18%, transparent) 17px, color-mix(in srgb, var(--gl) 18%, transparent) 19px,
+      transparent 19px, transparent 29px),
+    /* 細顆粒：feTurbulence + feColorMatrix 去彩度的灰白靜電 */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='90' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+  background-size:auto, auto, 140px 90px;
+  /* 橫向不規則的區塊遮罩：只有黑色那幾段看得到雜訊 */
+  -webkit-mask-image:linear-gradient(90deg,
+    transparent 0%,  #000 3%,  #000 12%, transparent 14%,
+    transparent 20%, #000 22%, #000 27%, transparent 29%,
+    transparent 41%, #000 43%, #000 63%, transparent 65%,
+    transparent 72%, #000 74%, #000 80%, transparent 82%,
+    transparent 89%, #000 91%, #000 98%, transparent 100%);
+  mask-image:linear-gradient(90deg,
+    transparent 0%,  #000 3%,  #000 12%, transparent 14%,
+    transparent 20%, #000 22%, #000 27%, transparent 29%,
+    transparent 41%, #000 43%, #000 63%, transparent 65%,
+    transparent 72%, #000 74%, #000 80%, transparent 82%,
+    transparent 89%, #000 91%, #000 98%, transparent 100%);
+  -webkit-mask-size:240% 100%;  mask-size:240% 100%;
+  -webkit-mask-repeat:repeat-x; mask-repeat:repeat-x;
+}
+
+.home__route-btn.is-glitch .home__route-noise{
+  animation:routeNoise .5s steps(1,end) 1,
+            routeScan .1s steps(7) infinite,      /* 掃描線只在雜訊看得見的時候有意義 */
+            routeTear .5s steps(1,end) 1;         /* 橫向區塊左右跳，一格一格換位置 */
+}
+.home__route-btn.is-glitch::after{
+  animation:routeBlink .5s linear 1;
+}
+.home__route-btn.is-glitch::before{
+  animation:routeBlinkFill .5s steps(1,end) 1;
+}
+.home__route-btn.is-glitch .home__route-ico svg{
+  animation:routeBlinkIco .5s linear 1;
+}
+.home__route-btn.is-glitch .home__route-label{
+  animation:routeBlinkTxt .5s linear 1;
+}
+
+/* 雜訊忽隱忽現：兩段爆發（前段 0～28%、後段 68～84%），中間留一段乾淨的。
+   節奏跟殘影**故意不對齊** —— 對齊了就變成「一起呼吸」，錯開才像兩件事同時壞掉。 */
+@keyframes routeNoise{
+  0%      { opacity:.70 }
+  12%     { opacity:.10 }
+  20%     { opacity:.52 }
+  28%     { opacity:.18 }
+  68%     { opacity:.62 }
+  76%     { opacity:.08 }
+  84%     { opacity:.44 }
+  92%,100%{ opacity:0 }
+}
+
+/* 掃描線跳著捲（兩層速度不同，看起來才不規則），順便左右抖幾個 px 當撕裂感。
+   第三層是顆粒，位置也一起跳，顆粒才不會看起來像貼死的紋理。 */
+@keyframes routeScan{
+  0%   { background-position:0 0,       0 0,     0 0 }
+  25%  { background-position:3px -9px,  -2px 15px, 37px 23px }
+  50%  { background-position:-2px -18px, 3px 30px, 71px 8px }
+  75%  { background-position:2px -26px, -3px 44px, 19px 61px }
+  100% { background-position:0 -33px,   0 58px,  53px 40px }
+}
+
+/* 橫向區塊遮罩左右跳：每一格亮的地方都不一樣，就不會整條一起亮 */
+@keyframes routeTear{
+  0%   { -webkit-mask-position:0 0;    mask-position:0 0 }
+  12%  { -webkit-mask-position:-62% 0; mask-position:-62% 0 }
+  20%  { -webkit-mask-position:-18% 0; mask-position:-18% 0 }
+  28%  { -webkit-mask-position:-95% 0; mask-position:-95% 0 }
+  68%  { -webkit-mask-position:-41% 0; mask-position:-41% 0 }
+  76%  { -webkit-mask-position:-8% 0;  mask-position:-8% 0 }
+  84%  { -webkit-mask-position:-77% 0; mask-position:-77% 0 }
+  100% { -webkit-mask-position:-30% 0; mask-position:-30% 0 }
+}
+
+/* ── B：框線的殘影 + 整體提亮 ──────────────────────────
+   第 1 個 drop-shadow 是原本就有的光暈，後面四個是右二左二的殘影，
+   最後的 brightness 是舊版那種「整條忽亮」的提亮（跟殘影同一組拍點，所以是一起衝出去的）。 */
+@keyframes routeBlink{
+  0%, 100% { filter:
+    drop-shadow(0 0 .45rem color-mix(in srgb, var(--gl) 55%, transparent))
+    drop-shadow(0 0 0 transparent)
+    drop-shadow(0 0 0 transparent)
+    drop-shadow(0 0 0 transparent)
+    drop-shadow(0 0 0 transparent)
+    brightness(1) }
+  16% { filter:
+    drop-shadow(0 0 .8rem color-mix(in srgb, var(--gl) 62%, transparent))
+    drop-shadow(5px 0 0 color-mix(in srgb, var(--gl) 48%, transparent))
+    drop-shadow(-3px 0 0 color-mix(in srgb, var(--gl) 20%, transparent))
+    drop-shadow(9px 0 0 color-mix(in srgb, var(--gl) 24%, transparent))
+    drop-shadow(-5px 0 0 color-mix(in srgb, var(--gl) 10%, transparent))
+    brightness(1.35) }
+  34% { filter:
+    drop-shadow(0 0 .55rem color-mix(in srgb, var(--gl) 55%, transparent))
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gl) 18%, transparent))
+    drop-shadow(-1px 0 0 color-mix(in srgb, var(--gl) 8%, transparent))
+    drop-shadow(3px 0 0 color-mix(in srgb, var(--gl) 9%, transparent))
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gl) 4%, transparent))
+    brightness(1) }
+  56% { filter:
+    drop-shadow(0 0 .9rem color-mix(in srgb, var(--gl) 66%, transparent))
+    drop-shadow(8px 0 0 color-mix(in srgb, var(--gl) 52%, transparent))
+    drop-shadow(-4px 0 0 color-mix(in srgb, var(--gl) 22%, transparent))
+    drop-shadow(15px 0 0 color-mix(in srgb, var(--gl) 26%, transparent))
+    drop-shadow(-8px 0 0 color-mix(in srgb, var(--gl) 11%, transparent))
+    brightness(1.5) }
+  76% { filter:
+    drop-shadow(0 0 .5rem color-mix(in srgb, var(--gl) 55%, transparent))
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gl) 14%, transparent))
+    drop-shadow(-1px 0 0 color-mix(in srgb, var(--gl) 6%, transparent))
+    drop-shadow(4px 0 0 color-mix(in srgb, var(--gl) 7%, transparent))
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gl) 3%, transparent))
+    brightness(1) }
+  90% { filter:
+    drop-shadow(0 0 .65rem color-mix(in srgb, var(--gl) 58%, transparent))
+    drop-shadow(4px 0 0 color-mix(in srgb, var(--gl) 30%, transparent))
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gl) 12%, transparent))
+    drop-shadow(7px 0 0 color-mix(in srgb, var(--gl) 15%, transparent))
+    drop-shadow(-4px 0 0 color-mix(in srgb, var(--gl) 6%, transparent))
+    brightness(1.3) }
+}
+
+/* 圖示：同一套殘影，偏移小一點（圖示本來就小，推太遠會糊成一團），再加上真的位移和提亮 */
+@keyframes routeBlinkIco{
+  0%, 100% { transform:translateX(0); filter:
+    drop-shadow(0 0 .6rem color-mix(in srgb, var(--gl-soft) 45%, transparent))
+    drop-shadow(0 0 0 transparent)
+    drop-shadow(0 0 0 transparent)
+    brightness(1) }
+  16% { transform:translateX(2px); filter:
+    drop-shadow(0 0 .9rem color-mix(in srgb, var(--gl) 55%, transparent))
+    drop-shadow(3px 0 0 color-mix(in srgb, var(--gl) 45%, transparent))
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gl) 18%, transparent))
+    brightness(1.3) }
+  34% { transform:translateX(-1px); filter:
+    drop-shadow(0 0 .65rem color-mix(in srgb, var(--gl-soft) 45%, transparent))
+    drop-shadow(1px 0 0 color-mix(in srgb, var(--gl) 15%, transparent))
+    drop-shadow(-1px 0 0 color-mix(in srgb, var(--gl) 6%, transparent))
+    brightness(1) }
+  56% { transform:translateX(4px); filter:
+    drop-shadow(0 0 1rem color-mix(in srgb, var(--gl) 60%, transparent))
+    drop-shadow(5px 0 0 color-mix(in srgb, var(--gl) 48%, transparent))
+    drop-shadow(-3px 0 0 color-mix(in srgb, var(--gl) 20%, transparent))
+    brightness(1.4) }
+  76% { transform:translateX(-1px); filter:
+    drop-shadow(0 0 .6rem color-mix(in srgb, var(--gl-soft) 45%, transparent))
+    drop-shadow(1px 0 0 color-mix(in srgb, var(--gl) 12%, transparent))
+    drop-shadow(-1px 0 0 color-mix(in srgb, var(--gl) 5%, transparent))
+    brightness(1) }
+  90% { transform:translateX(2px); filter:
+    drop-shadow(0 0 .75rem color-mix(in srgb, var(--gl) 50%, transparent))
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gl) 26%, transparent))
+    drop-shadow(-1px 0 0 color-mix(in srgb, var(--gl) 10%, transparent))
+    brightness(1.25) }
+}
+
+/* 文字：跟著框和圖示一起被推。位移比圖示再大一點（整塊字一起走比較看得出來），
+   殘影一樣是右邊推得遠、左邊淺淺一層。文字不加 brightness —— 字提亮會糊掉、反而看不清楚。 */
+@keyframes routeBlinkTxt{
+  0%, 100% { transform:translateX(0); filter:
+    drop-shadow(0 0 0 transparent)
+    drop-shadow(0 0 0 transparent) }
+  16% { transform:translateX(3px); filter:
+    drop-shadow(4px 0 0 color-mix(in srgb, var(--gl) 42%, transparent))
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gl) 16%, transparent)) }
+  34% { transform:translateX(-1px); filter:
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gl) 14%, transparent))
+    drop-shadow(-1px 0 0 color-mix(in srgb, var(--gl) 6%, transparent)) }
+  56% { transform:translateX(6px); filter:
+    drop-shadow(7px 0 0 color-mix(in srgb, var(--gl) 48%, transparent))
+    drop-shadow(-4px 0 0 color-mix(in srgb, var(--gl) 18%, transparent)) }
+  76% { transform:translateX(-2px); filter:
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gl) 12%, transparent))
+    drop-shadow(-1px 0 0 color-mix(in srgb, var(--gl) 5%, transparent)) }
+  90% { transform:translateX(3px); filter:
+    drop-shadow(3px 0 0 color-mix(in srgb, var(--gl) 26%, transparent))
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gl) 10%, transparent)) }
+}
+
+/* 底光：跟殘影同步閃一下。這一支維持硬跳（steps），配合抖動的節奏。
+   雜訊已經另外有一層了，這裡只管顏色。 */
+@keyframes routeBlinkFill{
+  0%      { background-color:color-mix(in srgb, var(--gl-soft) 16%, transparent) }
+  34%     { background-color:transparent }
+  56%     { background-color:color-mix(in srgb, var(--gl-soft) 18%, transparent) }
+  76%     { background-color:transparent }
+  90%     { background-color:color-mix(in srgb, var(--gl-soft) 12%, transparent) }
+  96%,100%{ background-color:transparent }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .home__route-btn.is-glitch .home__route-noise,
+  .home__route-btn.is-glitch::after,
+  .home__route-btn.is-glitch::before,
+  .home__route-btn.is-glitch .home__route-ico svg,
+  .home__route-btn.is-glitch .home__route-label{ animation:none }
+}
+/* ---------- 逃生動線示範（原本歡迎面板的位置） ---------- */
+.home__route{
+  grid-area:panel;align-self:center;
+  display:flex;flex-direction:column;gap:1.2rem;
+}
+
+/* 框線發光沿用第一頁階段卡亮起時那一套：細框 + 亮色漸層 + 框線層打光暈 */
+.home__route-btn{
+  --ch:.7rem;
+  --bw:.85px;
+  --glass:linear-gradient(155deg,
+    rgba(255,255,255,.07) 0%, rgba(255,255,255,.015) 48%, rgba(255,255,255,.04) 100%);
+  --stroke:linear-gradient(140deg,
+    var(--brand-hi) 0%,
+    color-mix(in srgb, var(--brand-hi) 52%, transparent) 48%,
+    var(--brand-hi) 100%);
+  padding:1.5rem 1.5rem;
+  display:flex;align-items:center;gap:1.1rem;
+  cursor:pointer;font-family:inherit;color:var(--ink);text-align:left;
+  transition:color .2s var(--ease);
+}
+.home__route-btn::before{backdrop-filter:blur(9px)}
+.home__route-btn::after{
+  filter:drop-shadow(0 0 .45rem color-mix(in srgb, var(--brand-hi) 55%, transparent));
+}
+.home__route-btn:hover{--bw:1.2px;color:var(--brand-hi)}
+.home__route-btn:focus-visible{outline:2px solid var(--brand-hi);outline-offset:2px}
+.home__route-btn:active{translate:0 1px}
+
+.home__route-ico{width:2.7rem;height:2.7rem;flex:none;color:var(--brand-hi)}
+.home__route-ico svg{
+  width:100%;height:100%;fill:none;stroke:currentColor;
+  stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 .6rem color-mix(in srgb, var(--brand) 45%, transparent));
+}
+.home__route-label{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.home__route-label b{font-size:1.2rem;font-weight:700;letter-spacing:.16em}
+.home__route-label i{
+  font-family:'Oswald',sans-serif;font-style:normal;
+  font-size:.7rem;font-weight:400;letter-spacing:.26em;color:var(--ink-3);
+}
+
+/* ---------- 抵達出口：恭喜通關 ---------- */
+.home__clear{
+  position:absolute;inset:0;z-index:5;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;                      /* 只是蓋著慶祝，不擋按鈕 */
+  opacity:0;transition:opacity .4s var(--ease);
+}
+.home__clear.is-on{opacity:1}
+.home__clear-box{
+  --ch:1rem;
+  --bw:1px;
+  --glass:linear-gradient(155deg,
+    rgba(255,255,255,.09) 0%, rgba(255,255,255,.02) 48%, rgba(255,255,255,.05) 100%);
+  --stroke:linear-gradient(140deg,
+    var(--brand-hi) 0%,
+    color-mix(in srgb, var(--brand-hi) 55%, transparent) 48%,
+    var(--brand-hi) 100%);
+  padding:2.4rem 3.6rem;text-align:center;
+  filter:drop-shadow(0 .6rem 1.8rem rgba(0,0,0,.6));
+}
+.home__clear-box::before{backdrop-filter:blur(9px)}
+.home__clear-box::after{
+  filter:drop-shadow(0 0 .8rem color-mix(in srgb, var(--brand-hi) 65%, transparent));
+}
+.home__clear-box b{
+  display:block;font-size:3.2rem;font-weight:700;letter-spacing:.3em;line-height:1;
+  padding-left:.3em;                        /* 補掉字距在尾端多出來的空白，視覺才置中 */
+  color:var(--ink);
+  text-shadow:0 0 1.2rem color-mix(in srgb, var(--brand-hi) 55%, transparent),
+              0 0 3rem color-mix(in srgb, var(--brand) 60%, transparent);
+}
+.home__clear-box i{
+  display:block;margin-top:.9rem;
+  font-family:'Oswald',sans-serif;font-style:normal;
+  font-size:.9rem;font-weight:400;letter-spacing:.3em;
+  padding-left:.3em;color:var(--brand-hi);
+}
+.home__clear.is-on .home__clear-box{animation:clearPop .5s var(--ease) both}
+@keyframes clearPop{
+  0%{scale:.9;opacity:0}
+  60%{scale:1.02}
+  100%{scale:1;opacity:1}
+}
+@media (prefers-reduced-motion:reduce){
+  .home__clear.is-on .home__clear-box{animation:none}
+}
+
+/* ---------- 底部：左邊三個功能鍵、右邊大樓標語 ---------- */
+.home__foot{
+  grid-area:foot;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;
+}
+
+/* 尺寸跟第一頁「正確應對」那排的 .act 對齊 */
+.home__acts{list-style:none;display:flex;gap:.9rem}
+.home__act{
+  --ch:.5rem;
+  width:15rem;padding:1.15rem .6rem 1rem;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;
+  min-height:8.5rem;                 /* 沒有第二行說明字，補高度才跟 .act 一樣大 */
+  cursor:pointer;font-family:inherit;color:var(--ink);
+  transition:color .2s var(--ease);
+}
+.home__act:hover{--bw:1.2px;color:var(--brand-hi)}
+.home__act:focus-visible{outline:2px solid var(--brand-hi);outline-offset:2px}
+.home__act-ico{width:3.1rem;height:3.1rem;margin-bottom:.35rem;color:var(--brand-hi)}
+.home__act-ico svg{
+  width:100%;height:100%;fill:none;stroke:currentColor;
+  stroke-width:1.25;stroke-linecap:round;stroke-linejoin:round;
+}
+.home__act b{font-size:.9rem;font-weight:700;letter-spacing:.1em}
+
+/* 大樓名稱和標語條互相置中，不是靠右對齊 */
+.home__guide{display:flex;flex-direction:column;align-items:center;gap:.7rem;text-align:center}
+.home__guide-title{
+  font-size:1.5rem;font-weight:700;letter-spacing:.06em;color:var(--ink);
+  text-shadow:0 0 1.6rem var(--brand-soft);
+  padding-left:.06em;                       /* 同樣補字距 */
+}
+.home__guide-name{color:var(--brand-hi)}
+/* 尺寸跟第一頁底部警語 .warn 對齊 */
+.home__guide-slogan{
+  --ch:.5rem;
+  --glass:linear-gradient(100deg,
+    color-mix(in srgb, var(--brand) 16%, transparent) 0%,
+    color-mix(in srgb, var(--brand) 6%, transparent) 100%);
+  padding:.62rem 1rem;
+  font-size:.92rem;font-weight:500;letter-spacing:.2em;color:var(--brand-hi);
+  /* 字距會在最後一個字後面多留一格，補回來文字才真的置中 */
+  text-align:center;padding-left:calc(1rem + .2em);
+}
+
+/* 只給螢幕報讀，不顯示 */
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip-path:inset(50%);white-space:nowrap;
+}
+
+/* =========================================================
+   窄螢幕 / 直式 — 保持不橫向捲動
+   ========================================================= */
+@media (max-aspect-ratio: 5/4){
+  .layout{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
+  .col-side{flex-direction:row;align-items:stretch;gap:.9rem}
+  .side-head{text-align:left;flex:none;align-self:center;max-width:11rem}
+  .phases{flex-direction:row;flex:1}
+  .phase{flex:1}
+  .mid{grid-template-columns:1fr}
+  .stage{display:none}
+}
+
+/* =========================================================
+   狀態切換的黑幕
+   切狀態（動線 → 通關之類）不要用鏡頭飛過去銜接，會轉得很怪。
+   改成：把 3D 黑掉 → 趁看不見把鏡頭放到定位、換配色 → 再亮起來。
+   **只黑模型**，版面上的字和按鈕不要跟著消失，所以這塊是放在 .stage 裡面。
+   ========================================================= */
+.blackout{
+  position:absolute;inset:0;z-index:2;      /* 只蓋住 3D（canvas 沒有 z-index），舞台標籤 z-index:3 還看得到 */
+  background:#000;opacity:0;pointer-events:none;
+  transition:opacity .22s var(--ease);
+}
+.blackout.is-on{opacity:1}

@@ -1,0 +1,296 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createDetectionDiscs } from './detection-discs.js';
+
+export const disasters = [
+  {
+    "name": "火災",
+    "topics": [
+      [
+        "防火區劃",
+        [
+          "doors",
+          "walls"
+        ],
+        "建築透過防火門、防火窗等構件建立防火區劃，在火災發生時協助限制火勢向其他空間蔓延。公區生命週期計畫也已將防火門、防火窗納入後續保養與更新管理。",
+        "平時保持防火門正常關閉，不以物品固定門扇，也不要堆放物品妨礙防火門運作。"
+      ],
+      [
+        "安全梯與避難",
+        [
+          "doors",
+          "core"
+        ],
+        "公共空間配置緊急照明、出口標示及避難方向指示等設備，在火災或停電時協助辨識避難方向，相關消防設備也納入後續定期維護管理。",
+        "平時熟悉出口；火災時依現場狀況及消防指示行動，不進入充滿濃煙的通道。"
+      ],
+      [
+        "偵測與初期應變",
+        [],
+        "建築配置火警受信總機、緊急廣播、探測、消防栓、泡沫滅火及自動撒水等設備，從偵測、警報到初期滅火形成多層防護。",
+        "發現火煙請先示警並通報；勿為取物返回危險區域。"
+      ]
+    ]
+  },
+  {
+    "name": "地震",
+    "topics": [
+      [
+        "梁柱抗震",
+        [
+          "beams",
+          "columns"
+        ],
+        "建築採用 0.41G 耐震設計，由結構骨架承受及傳遞地震作用，提升建築面對地震時的耐震能力。",
+        "日常裝修時，不任意拆改梁柱，也不要自行鑿切結構構件。"
+      ],
+      [
+        "結構與管線分離",
+        [],
+        "採用 SI 工法，將結構與管線分離，使管線在地震時具有搖晃與緩衝空間，也讓震後檢查及維修更容易進行。",
+        "裝修或變更管線前先確認原有設計，避免任意破壞結構或改變管線配置。"
+      ],
+      [
+        "地震感知與安全停靠",
+        ["core"],
+        "電梯配置地震感知器，地震發生時可自動定位並於避難樓層停靠開門，降低人員受困於電梯的風險。",
+        "地震發生時依現場指示避難；震後未確認設備安全前，不自行搭乘電梯。"
+      ]
+    ]
+  },
+  {
+    "name": "颱風",
+    "topics": [
+      [
+        "窗框與玻璃",
+        [
+          "frames",
+          "glass"
+        ],
+        "門窗的玻璃、框材與固定方式共同形成抵抗風雨的建築外殼，外牆金屬構件採用不鏽鋼材質，降低長期鏽蝕造成鬆動的風險。",
+        "颱風前檢查窗戶能否鎖妥，強風時避免靠近玻璃。"
+      ],
+      [
+        "外牆與結構",
+        [
+          "walls",
+          "beams",
+          "columns"
+        ],
+        "外牆構件的材料、固定與後續巡檢共同維持建築外殼的安全，並透過長期維護降低材料老化、鬆動與掉落的風險。",
+        "一旦發現外牆鬆動或異常聲響，通知管理單位檢查。"
+      ],
+      [
+        "樓板與排水界面",
+        [
+          "slabs"
+        ],
+        "建築配置雨水排水及相關抽水設備，包括雨水泵浦與機坑抽水設備，協助雨水排除。",
+        "平時清理可安全接近的排水口，收妥陽台物品。"
+      ]
+    ]
+  },
+  {
+    "name": "暴雨／淹水",
+    "topics": [
+      [
+        "排水與抽水",
+        [],
+        "建築配置雨水、廢水排水及抽水設備，在豪雨期間協助排除積水，相關設備並納入後續維護管理。",
+        "關注地下室與低窪處警示，不在進水時下地下室取車。"
+      ],
+      [
+        "機電與備援",
+        [],
+        "建築配置緊急發電機，並將發電設備納入定期保養與運轉管理，在停電等異常狀況下提供必要的備援能力。",
+        "留意社區公告與停電安排，勿接觸浸水電器。"
+      ]
+    ]
+  },
+  {
+    "name": "坡地／土砂",
+    "topics": [
+      [
+        "基地風險",
+        [],
+        "是否涉及坡地或土砂災害風險，仍須依基地位置、地形與地質條件判定；目前資料未提供坡地防護或擋土設施相關資訊。",
+        "遇到豪雨或颱風時，留意官方警戒與社區疏散通知。"
+      ],
+      [
+        "結構異常觀察",
+        [
+          "columns",
+          "walls"
+        ],
+        "建築的柱、牆及其他結構構件可作為觀察裂縫、傾斜等異常的位置；異常原因仍應由專業人員進一步判讀。",
+        "發現突然增大的裂縫、地面變形或異常聲響，遠離並通報。"
+      ],
+      [
+        "排水與地盤",
+        [],
+        "坡地安全也和排水、地盤狀況密切相關。排水路徑如果受到改變，可能影響原本的排水方式，因此這類設施不適合自行調整。",
+        "不要自行改變排水路徑，依警戒公告提前準備撤離。"
+      ]
+    ]
+  }
+];
+
+export function createPreventionPage(){
+  const page=document.createElement('section');page.className='page page--home page--prevention';page.dataset.page='prevention';
+  const home=document.querySelector('[data-page="home"]');
+  const brand=home.querySelector('.home__brand').cloneNode(true);
+  brand.removeAttribute('data-obj');brand.removeAttribute('data-label');
+  page.innerHTML='<div class="grain"></div><div class="prevention-heading"></div><p class="prevention-subtitle">先行預防</p><div class="stage prevention-stage" id="stage-prevention"></div>';
+  page.querySelector('.prevention-heading').append(brand);document.getElementById('app').append(page);
+  const nav=document.createElement('nav');nav.className='page-nav';nav.setAttribute('aria-label','展示頁面切換');
+  [['welcome','01','前言介紹'],['first','02','黃金30秒'],['home','03','逃生動線'],['prevention','04','先行預防'],['outro','05','結語']].forEach(([key,number,label])=>{
+    const button=document.createElement('button');button.type='button';button.dataset.goPage=key;button.innerHTML=`<span>${number}</span>${label}`;nav.append(button);
+  });
+  const skin=document.getElementById('skin-toggle');nav.append(skin);
+  const skinLabel=document.createElement('span');skinLabel.className='skin-toggle__label';skin.append(skinLabel);
+  const label=()=>{skinLabel.textContent=skin.getAttribute('aria-label')?.includes('淺色')?'淺色版':'深色版';};label();new MutationObserver(label).observe(skin,{attributes:true,attributeFilter:['aria-label']});
+  document.getElementById('app').append(nav);
+}
+
+export function createInformation(viewer){
+  const page=document.querySelector('[data-page="prevention"]');
+  const nav=document.createElement('nav');nav.className='information-nav';nav.setAttribute('aria-label','災害科普');
+  const panel=document.createElement('aside');panel.className='information-panel';panel.hidden=true;panel.setAttribute('aria-label','建築防災科普');
+  panel.innerHTML='<header><h2></h2><button type="button" aria-label="關閉科普解說">關閉</button></header><div class="information-topics"></div><h3></h3><p class="information-description"></p><p class="information-action"></p><p class="information-status" role="status"></p><p class="information-note">教學示意｜紅色代表選取的構件，不代表損壞或警報。構件用途與災害關聯包含推測，非本棟性能認證或即時避難指引。</p>';
+  page.append(nav,panel);
+  const detectionNote=document.createElement('p');detectionNote.className='detection-note';detectionNote.textContent='紅色圓盤為偵測設備示意，非實際設備位置、數量或警報。';detectionNote.hidden=true;panel.append(detectionNote);
+  let detection=null;
+  function clearDetection(){detection?.dispose();detection=null;detectionNote.hidden=true;}
+  const stage=document.getElementById('stage-prevention');
+  function sizeStage(){
+    const bounds=page.getBoundingClientRect(),upper=nav.getBoundingClientRect(),lower=(document.querySelector('.narration-dock:not([hidden])')||document.querySelector('.page-nav')).getBoundingClientRect();
+    if(!bounds.height||!bounds.width)return;
+    const scale=page.clientHeight/bounds.height;
+    const top=(upper.bottom-bounds.top+5)*scale,bottom=(lower.top-bounds.top-5)*scale;
+    stage.style.top=`${top}px`;stage.style.height=`${Math.max(100,bottom-top)}px`;
+    viewer.resize();
+  }
+  const root=new THREE.Group();root.name='information-components';viewer.modelRoot.add(root);
+  let cameraLimits=null,driftTimer=null;
+  function stopDrift(){clearTimeout(driftTimer);driftTimer=null;}
+  const overview=document.createElement('button');overview.type='button';overview.textContent='回到全景';overview.className='information-overview';panel.querySelector('header').after(overview);
+  function restoreLimits(){stopDrift();if(cameraLimits){viewer.controls.minDistance=cameraLimits.min;viewer.controls.maxDistance=cameraLimits.max;cameraLimits=null;}}
+  overview.onclick=()=>{restoreLimits();const tower=viewer.customModels.tower;if(tower)focusTopic(['全景',[]],[tower]);else viewer.releaseShot(1.2);};
+  // Cancel topic motion when the visitor starts dragging; keep OrbitControls available.
+  viewer.controls.addEventListener('start',()=>{if(page.classList.contains('is-active')){stopDrift();viewer._fly=null;viewer.controls.autoRotate=false;viewer.swing.on=false;}});
+  function boxes(group){if(!group)return [];group.updateWorldMatrix(true,true);return group.children.filter(x=>x.isMesh).map(mesh=>new THREE.Box3().setFromObject(mesh)).filter(box=>!box.isEmpty());}
+  function focusTopic(topic,groups){
+    if(!page.classList.contains('is-active'))return;
+    sizeStage();
+    if(!groups.length){overview.click();return;}
+    root.updateWorldMatrix(true,true);
+    const full=new THREE.Box3(),framingMeshes=[];groups.forEach(group=>{
+      if(group===viewer.customModels.tower){
+        // Hidden route runners/smoke helpers can extend to the origin. They must
+        // not pull the building's framing center below its actual geometry.
+        const materials=Object.values(viewer._blueprintMats??{});
+        group.updateWorldMatrix(true,true);
+        group.traverse(mesh=>{if(mesh.isMesh&&materials.includes(mesh.material)){full.union(new THREE.Box3().setFromObject(mesh));framingMeshes.push(mesh);}});
+      }else {full.union(new THREE.Box3().setFromObject(group));group.traverse(mesh=>{if(mesh.isMesh)framingMeshes.push(mesh);});}
+    });if(full.isEmpty())return;const center=full.getCenter(new THREE.Vector3());let target=center.clone(),size=full.getSize(new THREE.Vector3()),direction=new THREE.Vector3(1,.7,1),detail=false;
+    const mapped=Object.fromEntries(topic[1].map((key,i)=>[key,groups[i]]));
+    if(topic[0]==='防火區劃'||topic[0].includes('積水')||topic[0].includes('排水')){
+      // Principal horizontal axis of the actual geometry, not the world axes.
+      let xx=0,xz=0,zz=0,count=0,mx=0,mz=0;
+      const points=[];root.traverse(object=>{if(!object.isMesh)return;const p=object.geometry.attributes.position;for(let i=0;i<p.count;i+=Math.max(1,Math.floor(p.count/300))){const v=new THREE.Vector3().fromBufferAttribute(p,i).applyMatrix4(object.matrixWorld);points.push(v);mx+=v.x;mz+=v.z;count++;}});
+      mx/=count||1;mz/=count||1;points.forEach(p=>{const x=p.x-mx,z=p.z-mz;xx+=x*x;xz+=x*z;zz+=z*z;});
+      const angle=.5*Math.atan2(2*xz,xx-zz);
+      direction.set(-Math.sin(angle)*.025,1,Math.cos(angle)*.025);
+    }else if(topic[0]==='梁柱抗震'){
+      const joints=[];
+      for(const beam of boxes(mapped.beams))for(const column of boxes(mapped.columns)){
+        const hit=beam.clone().expandByScalar(.12).intersect(column);
+        if(!hit.isEmpty())joints.push(hit.getCenter(new THREE.Vector3()));
+      }
+      joints.sort((a,b)=>b.y-a.y||a.distanceToSquared(center)-b.distanceToSquared(center));
+      if(joints.length){target=joints[0];size.set(6,5,6);detail=true;direction.set(1,.65,1);}
+    }else if(topic[1].includes('glass')||topic[1].includes('frames')){
+      const candidates=boxes(mapped.glass??mapped.frames).filter(box=>{const s=box.getSize(new THREE.Vector3());return Math.max(s.x,s.y,s.z)<8&&Math.max(s.x,s.y,s.z)>.3;});
+      candidates.sort((a,b)=>a.getCenter(new THREE.Vector3()).distanceToSquared(viewer.camera.position)-b.getCenter(new THREE.Vector3()).distanceToSquared(viewer.camera.position));
+      if(candidates.length){const chosen=candidates[0];target=chosen.getCenter(new THREE.Vector3());size=chosen.getSize(new THREE.Vector3()).multiplyScalar(2.5);detail=true;direction.copy(target).sub(center);direction.y=.6;if(direction.length()<.1)direction.set(1,.3,1);
+      }
+    }else if(topic[0]==='安全梯與避難'){
+      const doors=boxes(mapped.doors);if(doors.length){const selected=doors.sort((a,b)=>b.max.y-a.max.y)[0];target=selected.getCenter(new THREE.Vector3());size.set(9,9,9);detail=true;direction.set(1,1.1,1);}
+    }
+    cameraLimits??={min:viewer.controls.minDistance,max:viewer.controls.maxDistance};viewer.controls.minDistance=2;viewer.controls.maxDistance=Math.max(cameraLimits.max,180);
+    // Fit the projected bounds to the model area, accounting for horizontal FOV.
+    // The previous max-dimension/vertical-FOV fit left wide top views too small.
+    const forward=direction.clone().normalize(),right=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),forward).normalize(),up=new THREE.Vector3().crossVectors(forward,right);
+    const fit=detail?new THREE.Box3().setFromCenterAndSize(target,size):full;
+    const fov=THREE.MathUtils.degToRad(viewer.camera.fov),tanY=Math.tan(fov/2),tanX=tanY*viewer.camera.aspect;
+    let distance=5;
+    const projected=[];
+    function include(v){const p=v.sub(target);projected.push([p.dot(right),p.dot(up),p.dot(forward)]);}
+    if(detail){for(const x of [fit.min.x,fit.max.x])for(const y of [fit.min.y,fit.max.y])for(const z of [fit.min.z,fit.max.z])include(new THREE.Vector3(x,y,z));}
+    else framingMeshes.forEach(mesh=>{const p=mesh.geometry.attributes.position;for(let i=0;i<p.count;i++)include(new THREE.Vector3().fromBufferAttribute(p,i).applyMatrix4(mesh.matrixWorld));});
+    // Use occupied geometry, not the empty corners of a rotated world bounding box.
+    // Solve vertical framing first, then retain only the horizontal safety constraint.
+    for(const [x,y,z] of projected)distance=Math.max(distance,z+Math.abs(x)/(tanX*.96),z+Math.abs(y)/(tanY*.96));
+    // Center the perspective silhouette, which need not share the world-box center.
+    for(let pass=0;pass<3;pass++){
+      let lo=Infinity,hi=-Infinity;
+      for(const [,y,z] of projected){const value=y/(distance-z);lo=Math.min(lo,value);hi=Math.max(hi,value);}
+      const offset=(lo+hi)*.5*distance;target.addScaledVector(up,offset);projected.forEach(p=>p[1]-=offset);
+      distance=5;for(const [x,y,z] of projected)distance=Math.max(distance,z+Math.abs(x)/(tanX*.96),z+Math.abs(y)/(tanY*.96));
+    }
+    const position=target.clone().add(direction.normalize().multiplyScalar(distance));
+    viewer._override=true;viewer._hold=true;viewer.controls.autoRotate=false;viewer.swing.on=false;
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,activeTicket=ticket;
+    const shot={pos:position.toArray(),target:target.toArray()};
+    viewer._flyTo(shot,reduced?.01:1.5,()=>{
+      if(reduced)return;
+      driftTimer=setTimeout(()=>{
+        if(activeTicket!==ticket||!page.classList.contains('is-active')||panel.hidden)return;
+        const near={pos:target.clone().add(position.clone().sub(target).multiplyScalar(1.025)).toArray(),target:target.toArray()};
+        function glide(next){if(activeTicket!==ticket||!page.classList.contains('is-active')||panel.hidden)return;viewer._flyTo(next,14,()=>glide(next===near?shot:near));}
+        glide(near);
+      },3000);
+    });
+  }
+  // Match the original tower coordinates; no independent normalization or camera changes.
+  const visibility=new MutationObserver(()=>{root.visible=page.classList.contains('is-active')&&!panel.hidden;if(!page.classList.contains('is-active')){++ticket;clearDetection();restoreLimits();}});
+  visibility.observe(page,{attributes:true,attributeFilter:['class']});
+  const cache=new Map();let ticket=0;
+  async function component(key){
+    if(!cache.has(key))cache.set(key,new GLTFLoader().loadAsync(`./models/information/component-${key}.gltf`).then(({scene})=>{
+      scene.updateMatrixWorld(true);const group=new THREE.Group();
+      scene.traverse(source=>{if(!source.isMesh)return;const geometry=source.geometry.clone();geometry.applyMatrix4(source.matrixWorld);
+        const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:key==='doors'?.85:(key==='glass'||key==='frames')?.4:.32,depthWrite:false,depthTest:false,side:THREE.DoubleSide}));mesh.renderOrder=90;group.add(mesh);
+        const lines=new THREE.LineSegments(new THREE.EdgesGeometry(geometry,30),new THREE.LineBasicMaterial({color:0xff4545,transparent:true,opacity:.85,depthTest:false,depthWrite:false}));lines.renderOrder=91;group.add(lines);
+      });return group;
+    }).catch(error=>{cache.delete(key);throw error;}));return cache.get(key);
+  }
+  async function selectTopic(topic,button){
+    window.dispatchEvent(new CustomEvent('information:selection',{detail:{disaster:disasters.find(d=>d.topics.includes(topic))?.name,topic:topic[0],description:topic[2],action:topic[3]}}));
+    window.dispatchEvent(new CustomEvent('narration:topic',{detail:topic[0]}));
+    panel.querySelectorAll('.information-topics button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+    panel.querySelector('h3').textContent=topic[0];panel.querySelector('.information-description').textContent=topic[2];panel.querySelector('.information-action').textContent=topic[3];
+    const status=panel.querySelector('.information-status');const id=++ticket;stopDrift();viewer._fly=null;clearDetection();root.clear();root.visible=true;
+    if(topic[0]==='偵測與初期應變'){
+      try{
+        const [slabs,walls]=await Promise.all(['slabs','walls'].map(component));if(id!==ticket)return;
+        detection=createDetectionDiscs(slabs,walls);root.add(detection.group);detectionNote.hidden=false;
+        const tower=viewer.customModels.tower;focusTopic(topic,tower?[tower]:[detection.group]);
+      }catch{status.textContent='偵測示意載入未完成，請重新選取。';}
+      return;
+    }
+    status.textContent=topic[1].length?'正在載入相關構件…':'此主題以文字說明，不以其他構件代替設備。';
+    try{const groups=await Promise.all(topic[1].map(component));if(id!==ticket)return;groups.forEach(g=>{g.children.forEach(child=>child.visible=true);root.add(g);});focusTopic(topic,groups);status.textContent=groups.length?'紅色構件：'+topic[0]+' · 可拖曳調整視角':status.textContent;}
+    catch{if(id===ticket)status.textContent='構件載入未完成，請重新選取主題。';}
+  }
+  let requestedTopic=0;
+  disasters.forEach(disaster=>{const button=document.createElement('button');button.type='button';button.textContent=disaster.name;button.setAttribute('aria-pressed','false');nav.append(button);button.addEventListener('click',()=>{
+    panel.hidden=false;page.classList.add('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));panel.querySelector('h2').textContent=disaster.name+' · 建築防護';
+    const topics=panel.querySelector('.information-topics');topics.replaceChildren();disaster.topics.forEach(topic=>{const b=document.createElement('button');b.type='button';b.textContent=topic[0];b.setAttribute('aria-pressed','false');b.onclick=()=>selectTopic(topic,b);topics.append(b);});topics.children[requestedTopic]?.click();requestedTopic=0;
+  });});
+  panel.querySelector('header button').onclick=()=>{window.dispatchEvent(new CustomEvent('narration:topic',{detail:null}));++ticket;clearDetection();overview.click();root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
+  let resizeTimer;
+  panel.querySelector('header button').addEventListener('click',()=>window.dispatchEvent(new CustomEvent('information:selection',{detail:null})));
+  addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(page.classList.contains('is-active')){sizeStage();overview.click();}},180);});
+  return {catalog:disasters.map(d=>({name:d.name,topics:d.topics.map(t=>t[0])})),select(choice){const di=disasters.findIndex(d=>d.name===choice?.disaster);if(di<0)return;const ti=disasters[di].topics.findIndex(t=>t[0]===choice?.topic);if(ti<0)return;requestedTopic=ti;nav.children[di].click();},enter(){sizeStage();if(viewer.customModels.tower)overview.click();}};
+}

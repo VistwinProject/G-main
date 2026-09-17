@@ -1,0 +1,26 @@
+.information-nav{position:absolute;left:4.5%;top:24%;z-index:12;display:flex;gap:8px;flex-wrap:wrap;max-width:64%}
+.information-panel .information-status,.information-panel .information-note{display:none}
+.information-nav button,.information-panel button{font:inherit;cursor:pointer;color:#bfeaff;background:#071b2bea;border:1px solid #4485a0;padding:9px 14px;border-radius:4px}
+.information-nav button[aria-pressed=true],.information-panel button[aria-pressed=true]{color:#fff;border-color:#ff5555;background:#58242b}
+.information-nav button:focus-visible,.information-panel button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.information-panel{position:absolute;right:3.8%;top:23%;bottom:15%;width:29%;z-index:13;padding:20px;background:#071724f5;border:1px solid #61b9db;color:#e5f4ff;overflow:auto;box-shadow:0 12px 45px #0007;font-size:15px;line-height:1.75}
+.information-panel[hidden]{display:none}.information-panel header{display:flex;justify-content:space-between;align-items:center;gap:10px}.information-panel h2{font-size:23px;margin:0;color:#7dd9ff}.information-panel h3{font-size:19px;color:#fff;margin:18px 0 8px}.information-topics{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0}.information-panel p{margin:10px 0}.information-note{font-size:12px;color:#a9bfce;border-top:1px solid #426176;padding-top:12px}.information-status{color:#ff8585;font-size:13px}.information-open .home__status{visibility:hidden}
+@media(max-width:700px){.information-nav{gap:4px}.information-nav button{padding:5px;font-size:12px}.information-panel{width:38%;padding:10px;font-size:12px}.information-panel h2{font-size:17px}.information-panel h3{font-size:15px}}
+.page-nav{position:absolute;left:3rem;bottom:2rem;z-index:20;display:flex;gap:.65rem;padding:.6rem;border:1px solid var(--brand-line);border-radius:.5rem;background:var(--bg-0);max-width:calc(100% - 6rem);overflow-x:auto}
+.page-nav button{display:flex;align-items:center;gap:.65rem;min-height:44px;padding:.85rem 1.15rem;border:1px solid transparent;border-radius:.25rem;background:transparent;color:var(--ink-2);font:inherit;font-size:1.25rem;white-space:nowrap;cursor:pointer}
+.page-nav button span{font-size:.85em;opacity:.65}.page-nav .skin-toggle{position:static;width:auto;height:auto;border-left-color:var(--brand-line)}.page-nav .skin-toggle svg{width:1.6rem;height:1.6rem}.page-nav .skin-toggle__label{font-size:inherit;opacity:1}
+.page-nav button:hover,.page-nav button[aria-current="page"]{color:var(--brand-hi);background:var(--brand-soft);border-color:var(--brand-line)}.page-nav button:focus-visible{outline:2px solid var(--brand-hi);outline-offset:2px}
+.prevention-heading{position:absolute;left:4.5%;top:7%;z-index:6}.prevention-heading .home__name{font-size:5.425rem}.prevention-heading .home__mark{width:5.58rem;height:5.58rem}.prevention-subtitle{position:absolute;left:5%;top:18%;margin:0;color:var(--brand-hi);font-size:2rem;letter-spacing:.25em;z-index:6}.prevention-stage{position:absolute;left:-10%;top:7%;width:96%;height:83%}.page--prevention .information-panel{top:24%;bottom:15%}
+[data-skin="light"] .information-panel{background:#f8fbfffa;color:#28445b}[data-skin="light"] .information-panel h2,[data-skin="light"] .information-panel h3{color:#215479}[data-skin="light"] .information-note{color:#526b80}
+
+/* 展開整個右欄；內容跟隨展示畫布比例，不使用欄內捲動。 */
+.page--prevention .information-panel{top:7%;bottom:7%;width:32%;padding:2rem;overflow:visible;display:flex;flex-direction:column;font-size:1.75rem;line-height:1.65}
+.page--prevention .information-panel[hidden]{display:none}
+.information-panel header{gap:1rem}.information-panel h2{font-size:2.6rem}.information-panel h3{font-size:2.2rem;margin:1.6rem 0 .8rem}
+.information-panel button{padding:.8rem 1.2rem}.information-topics{gap:.8rem;margin:1.6rem 0}.information-panel p{margin:.8rem 0}
+.information-panel .information-note{margin-top:auto;padding-top:1.2rem;font-size:1.35rem}.information-panel .information-status{font-size:1.5rem}
+.prevention-stage{left:1%;top:27%;width:63%;height:61%}
+.information-panel .information-action{color:#79e6a2;font-weight:600}
+[data-skin="light"] .information-panel .information-action{color:#16713d}
+.information-panel .detection-note{margin-top:auto;font-size:1.2rem;color:var(--ink-2);line-height:1.5}
+.detection-note[hidden]{display:none}
