@@ -59,7 +59,7 @@ Main 的 server.mjs 再移至根目錄 server/server.mjs。
 | LAN | 本機經 LAN IP 172.20.10.3 存取兩頁 200，WS 可取 snapshot。IP 會隨網路改變 |
 | 實體平板跨機連線 | 尚待驗收：本機自連不能證明 Wi-Fi 隔離、防火牆或平板瀏覽器支援 |
 | 原 URL／除錯參數 | sync.js、editor 及頁面參數解析完全保留；?server= 覆寫程式仍在 |
-| 原部署方式 | 舊 repo Pages 未變；新 monorepo 發佈尚未遷移，見 README |
+| 原部署方式 | 第一階段初次交付未改 Pages；使用者後續授權更新，現改為 pages-stage1 發佈分支，詳見 README |
 
 自動測試執行 node server/verify.mjs；不對正在展演的主服務注入測試資料。
 測試時發現的窄視窗無模型是原 CSS @media(max-aspect-ratio:5/4) 隱藏 .stage，非搬移後模型遺失；未改版面。
@@ -69,7 +69,7 @@ Main 的 server.mjs 再移至根目錄 server/server.mjs。
 1. 遠端目標已確認為 VistwinProject/G-main 的 monorepo-stage1；是否合併到既有分支、如何切換部署仍待決定。
 2. 用實體平板在同一 LAN 開啟 /pad/，確認互動、動畫、語音球和 Wi-Fi 連線。
 3. 受信任 HTTPS/WSS 的展演部署（HTTP LAN 上 WebGPU 可能不可用），以及外部 CDN 可用性。
-4. 新 Pages／Node 主機發佈流程；只有驗證且人工確認後，才考慮封存舊 repo。
+4. Pages 靜態發佈已另建 tools/build-pages.mjs 與 pages-stage1 分支；Node/WSS 主機部署仍待決定。只有驗證且人工確認後，才考慮封存舊 repo。
 5. 如需嚴格跨裝置動畫同步精度，另排量測；本階段未重構協定、ACK、恢復或動畫對時。
 
 已知相容性包含同 origin 的 skin 儲存鍵、窄螢幕隱藏 3D、CDN 依賴、WebGPU 安全來源和既有 WebSocket 限制，詳見 README。
