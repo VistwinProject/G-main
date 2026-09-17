@@ -266,6 +266,7 @@ export function createInformation(viewer){
     }).catch(error=>{cache.delete(key);throw error;}));return cache.get(key);
   }
   async function selectTopic(topic,button){
+    window.dispatchEvent(new CustomEvent('information:selection',{detail:{disaster:disasters.find(d=>d.topics.includes(topic))?.name,topic:topic[0],description:topic[2],action:topic[3]}}));
     window.dispatchEvent(new CustomEvent('narration:topic',{detail:topic[0]}));
     panel.querySelectorAll('.information-topics button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
     panel.querySelector('h3').textContent=topic[0];panel.querySelector('.information-description').textContent=topic[2];panel.querySelector('.information-action').textContent=topic[3];
@@ -282,12 +283,14 @@ export function createInformation(viewer){
     try{const groups=await Promise.all(topic[1].map(component));if(id!==ticket)return;groups.forEach(g=>{g.children.forEach(child=>child.visible=true);root.add(g);});focusTopic(topic,groups);status.textContent=groups.length?'紅色構件：'+topic[0]+' · 可拖曳調整視角':status.textContent;}
     catch{if(id===ticket)status.textContent='構件載入未完成，請重新選取主題。';}
   }
+  let requestedTopic=0;
   disasters.forEach(disaster=>{const button=document.createElement('button');button.type='button';button.textContent=disaster.name;button.setAttribute('aria-pressed','false');nav.append(button);button.addEventListener('click',()=>{
     panel.hidden=false;page.classList.add('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));panel.querySelector('h2').textContent=disaster.name+' · 建築防護';
-    const topics=panel.querySelector('.information-topics');topics.replaceChildren();disaster.topics.forEach(topic=>{const b=document.createElement('button');b.type='button';b.textContent=topic[0];b.setAttribute('aria-pressed','false');b.onclick=()=>selectTopic(topic,b);topics.append(b);});topics.firstElementChild.click();
+    const topics=panel.querySelector('.information-topics');topics.replaceChildren();disaster.topics.forEach(topic=>{const b=document.createElement('button');b.type='button';b.textContent=topic[0];b.setAttribute('aria-pressed','false');b.onclick=()=>selectTopic(topic,b);topics.append(b);});topics.children[requestedTopic]?.click();requestedTopic=0;
   });});
   panel.querySelector('header button').onclick=()=>{window.dispatchEvent(new CustomEvent('narration:topic',{detail:null}));++ticket;clearDetection();overview.click();root.clear();root.visible=false;panel.hidden=true;page.classList.remove('information-open');nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));};
   let resizeTimer;
+  panel.querySelector('header button').addEventListener('click',()=>window.dispatchEvent(new CustomEvent('information:selection',{detail:null})));
   addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(page.classList.contains('is-active')){sizeStage();overview.click();}},180);});
-  return {enter(){sizeStage();if(viewer.customModels.tower)overview.click();}};
+  return {catalog:disasters.map(d=>({name:d.name,topics:d.topics.map(t=>t[0])})),select(choice){const di=disasters.findIndex(d=>d.name===choice?.disaster);if(di<0)return;const ti=disasters[di].topics.findIndex(t=>t[0]===choice?.topic);if(ti<0)return;requestedTopic=ti;nav.children[di].click();},enter(){sizeStage();if(viewer.customModels.tower)overview.click();}};
 }

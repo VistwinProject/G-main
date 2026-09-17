@@ -171,6 +171,10 @@ server.on('upgrade', (req, socket) => {
       let msg; try { msg = JSON.parse(payload.toString('utf8')); } catch { continue; }
       if (!msg || typeof msg !== 'object') continue;
       if (msg.type === 'hello') { wsSend(c, state); continue; }
+      if(msg.type==='voice'){
+        if(c.role==='display')broadcast({type:'voice',active:!!msg.active,level:Math.max(0,Math.min(1,Number(msg.level)||0))},c);
+        continue;
+      }
 
       // 主展示端送來的狀態：存下來 + 轉給其他人
       state = { ...state, ...msg, _sourceRole:c.role, ts: Date.now() };

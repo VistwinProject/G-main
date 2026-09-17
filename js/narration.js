@@ -203,19 +203,25 @@ export function createNarration({navigate}){
   audio.addEventListener('ended',()=>{sync();if(clipQueue.length){loadClip(clipQueue.shift());play();return;}if(current==='welcome')navigate('intro');});
   toggle.onclick=()=>{if(closingHold){clearTimeout(closingTimer);closingTimer=null;closingHold=false;audio.playbackRate=.93;toggle.textContent='播放語音';return;}audio.paused?play():audio.pause();};wave.onclick=()=>{if(audio.getAttribute('src'))toggle.onclick();};controls.querySelector('.voice-replay').onclick=()=>{if(clipSequence.length){playClips(clipSequence);return;}resetClosing();audio.currentTime=0;sync();play();};
   // Reuse the player's single audio graph. Silence changes level, never show state.
-  function draw(){
+  function speechLevel(){
     let level=0;
     if(showActive&&analyser&&!audio.paused&&!audio.ended){
       analyser.getFloatTimeDomainData(samples);
       const rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);
       level=Math.min(1,Math.max(0,rms-.008)*5);
     }
-    if(orbReady)orb.setLevel(level);
+    return level;
+  }
+  const sendVoice=()=>window.dispatchEvent(new CustomEvent('narration:level',{detail:{active:showActive,level:speechLevel()}}));
+  const voiceTimer=setInterval(sendVoice,50);
+  audio.addEventListener('pause',sendVoice);audio.addEventListener('ended',sendVoice);
+  function draw(){
+    if(orbReady)orb.setLevel(speechLevel());
     if(current==='welcome')sync();
     raf=requestAnimationFrame(draw);
   }
   draw();
-  window.addEventListener('pagehide',event=>{if(!event.persisted){cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb.dispose();audio.pause();context?.close();}});
+  window.addEventListener('pagehide',event=>{if(!event.persisted){clearInterval(voiceTimer);cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb.dispose();audio.pause();context?.close();}});
   return {enter(id){++request;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
     const file=files[id]||pageNarration[id]?.file;
     dock.hidden=id==='welcome';dock.dataset.page=id;dockCaption.textContent='';

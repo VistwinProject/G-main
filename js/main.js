@@ -65,6 +65,7 @@ const SCENE_PAGE = { welcome:'welcome', intro: 'intro', golden30: 'first', aiRou
      route-play：重複目前這一條（Pad 出口頁的 ▶）
      route-next：隨機換一條（Pad 出口頁的 ⇄，以及 App 頁的「逃生指引」） */
 const PAD_CMD = {
+  'prevention-select': (s) => information.select(s.preventionChoice),
   'route-play': () => playRouteDemo(true),
   'route-next': () => playRouteDemo(false),
 };
@@ -80,10 +81,13 @@ let padCmdReady = false;
 const sync = createSync({
   role: 'display',
   onState: (s) => {
+    // Record the relay snapshot even while the opening blocks navigation.
+    // Otherwise the first genuine Pad command after opening is discarded.
+    if(!padCmdReady){padCmdReady=true;padCmdSeen=s?.cmdId??null;}
     // Display heartbeats describe playback; they are not navigation commands.
     if(s?._sourceRole==='display')return;
     // Do not let a cached Pad scene skip the audio opening before it finishes.
-    try { if (current === 'welcome') return; } catch { return; }
+    try { if (current === 'welcome' && !(s?.cmd==='page-select'&&s?.cmdId!==padCmdSeen)) return; } catch { return; }
     /* ⚠️ 一定要包 try/catch。這個 callback 是從 WebSocket 的 onmessage 裡叫的，
        而 goto() 會碰到 current / pageEls / countdown / viewer 一整串模組層級的東西。
        模組初始化如果中途失敗（例如這台開不了 WebGL，new Viewer() 直接拋），
@@ -104,7 +108,7 @@ const sync = createSync({
     if (!s?.cmd || id === padCmdSeen) return;                          // 舊的、或沒有指令
     padCmdSeen = id;
     console.log('[sync] Pad 按了 ' + s.cmd);
-    try { PAD_CMD[s.cmd]?.(); }
+    try { PAD_CMD[s.cmd]?.(s); }
     catch (e) { console.warn('[sync] 執行 Pad 的指令失敗', e); }
   },
 });
@@ -121,6 +125,9 @@ const sync = createSync({
       **定時再推一次**（HEARTBEAT），不然 Pad 晚開機／重連時拿到的是一份
       now 很舊的狀態，算出來的進度會停在當初推的那一刻。 */
 let anim = null;
+let preventionInfo=null;
+window.addEventListener('narration:level',e=>sync.send({type:'voice',...e.detail}));
+window.addEventListener('information:selection',event=>{preventionInfo=event.detail;pushSync();});
 const HEARTBEAT = 1000;
 
 /** 把目前狀態推給 Pad。切頁、開始跑動線、通關、回待機都要叫一次。 */
@@ -128,6 +135,8 @@ function pushSync() {
   const live = routeState === 'running' || routeState === 'cleared';
   sync.send({
     scene: SCENE[current] ?? 'intro',
+    prevention:preventionInfo,
+    preventionCatalog:information.catalog,
     phase: routeState,                       // idle | running | cleared
     route: lastRoute,
     // 建議出口＝動線 1/2/3 走 A、4/5 走 B（跟右上狀態面板同一條規則）。
