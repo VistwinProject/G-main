@@ -98,8 +98,8 @@ npm test
 
 ## 部署與已知限制
 
-- 本機已建立 monorepo 與保留歷史的提交；尚未設定新 GitHub remote。
-- G-main / G-pad 舊遠端及既有 GitHub Pages 完全不動；不能把 repo 根目錄直接當成原 Pages 發佈根目錄。
+- monorepo 使用現有 VistwinProject/G-main，遠端分支為 monorepo-stage1；不另建 G-system GitHub repo。
+- G-main 的其他分支、G-pad repo 及既有 GitHub Pages 保持不動；不能把 repo 根目錄直接當成原 Pages 發佈根目錄。
 - 若需新 Pages，後續需設定發佈 apps/main 與 apps/pad 的工作流程；Pages 不能執行 Node/WebSocket 或寫入版面 JSON，另需常駐 Node 主機／代理。
 - CDN Three.js 與 Google Fonts 仍需網路，未進行離線打包。
 - 語音球沿用 WebGPU；實體平板開 HTTP LAN IP 不屬安全來源，WebGPU 可能不可用。完整語音球需裝置支援並以受信任 HTTPS/WSS 服務，或另訂部署方案。本階段沒有改 shader 或以低畫質替代。
@@ -107,4 +107,3 @@ npm test
 - 同瀏覽器同 origin 的兩頁仍沿用 skin 儲存鍵，重整時可能讀到彼此最後選的深淺色；跨装置不受此影響。未為此重構前端。
 - 伺服器沿用無驗證的 LAN 同步／編輯機制，僅供信任的展演網路；不要直接暴露到公網。
 - 原有 WebSocket 僅支援未分片文字訊框、close 行為等限制保留；沒有進入協定統一、ACK 或狀態恢復重構。
-

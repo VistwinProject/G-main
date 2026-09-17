@@ -8,7 +8,7 @@
 - 8033b2d：Main 80 個受追蹤檔案原樣移至 apps/main（100% renames）。
 - ba5d708：以保留父提交的 merge 匯入 Pad 到 apps/pad；第二父提交為 f4e3eb4。
 - 兩個來源提交均通過 merge-base --is-ancestor；沒有 filter/rebase/force push。
-- 新 repo 不保留指向原 repo 的 origin，以免誤推。原 repo／遠端／Pages 未刪除、改寫或封存。
+- 初次本機遷移未設定 origin；使用者後續指定沿用 G-main，因此 origin 改為 https://github.com/VistwinProject/G-main.git，僅發佈 monorepo-stage1 分支。其他分支、G-pad 與既有 Pages 保持不動。
 - 來源工作目錄內未受追蹤的實驗檔、舊音檔及筆記沒有擅自納入新 repo。
 - Main 75、Pad 20 個非工具／搬移伺服器的受追蹤檔案已與來源 Git blob 比對相同；包含 UI、CSS、JS、音檔、模型、shader、layout JSON。
 
@@ -66,11 +66,10 @@ Main 的 server.mjs 再移至根目錄 server/server.mjs。
 
 ## 待人工／下一階段決定
 
-1. 新 GitHub repo 的擁有者、名稱與可見性；確認前不新增遠端或推送。
+1. 遠端目標已確認為 VistwinProject/G-main 的 monorepo-stage1；是否合併到既有分支、如何切換部署仍待決定。
 2. 用實體平板在同一 LAN 開啟 /pad/，確認互動、動畫、語音球和 Wi-Fi 連線。
 3. 受信任 HTTPS/WSS 的展演部署（HTTP LAN 上 WebGPU 可能不可用），以及外部 CDN 可用性。
 4. 新 Pages／Node 主機發佈流程；只有驗證且人工確認後，才考慮封存舊 repo。
 5. 如需嚴格跨裝置動畫同步精度，另排量測；本階段未重構協定、ACK、恢復或動畫對時。
 
 已知相容性包含同 origin 的 skin 儲存鍵、窄螢幕隱藏 3D、CDN 依賴、WebGPU 安全來源和既有 WebSocket 限制，詳見 README。
-
