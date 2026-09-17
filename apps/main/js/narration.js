@@ -1,4 +1,5 @@
-import {mountOrb} from '../assets/anlb-orb/orb.js';
+// The approved renderer is lazy-loaded by the 9 key; off means no GPU drawing.
+const initialOrbEnabled = new URLSearchParams(location.search).get('orb') === 'on';
 export const clipTranscripts = {
   'flood-drainage.mp3':[
     '建築配置雨水、廢水排水及抽水設備，在豪雨期間協助排除積水，',
@@ -166,16 +167,45 @@ export function createNarration({navigate}){
   dock.append(dockCaption);document.getElementById('app').append(dock);
   wave.replaceChildren();
   const orbHost=document.createElement('span');orbHost.className='voice-orb';wave.append(orbHost);
-  const orb=mountOrb(orbHost);orb.canvas.setAttribute('aria-hidden','true');
-  let showActive=false,orbReady=false;
-  orb.ready.then(()=>{orbReady=true;if(showActive)orb.start();}).catch(()=>{
-    wave.setAttribute('aria-label','語音球無法顯示，按一下仍可播放旁白');
-  });
+  let orb=null,orbEnabled=false,orbReady=false,showActive=false,orbRequest=0,orbModule;
+  wave.style.display='none';
+  async function setOrbEnabled(enabled){
+    const ticket=++orbRequest;
+    orbEnabled=enabled;orbReady=false;
+    orb?.dispose();orb=null;
+    wave.style.display=enabled?'':'none';
+    if(current==='welcome')controls.hidden=enabled;
+    if(!enabled)return;
+    let candidate;
+    try{
+      const module=await (orbModule??=import('../assets/anlb-orb/orb.js'));
+      if(ticket!==orbRequest)return;
+      candidate=module.mountOrb(orbHost);candidate.canvas.setAttribute('aria-hidden','true');
+      await candidate.ready;
+      // Initialization can finish after a second press: release that stale renderer.
+      if(ticket!==orbRequest){candidate.dispose();return;}
+      orb=candidate;orbReady=true;
+      if(showActive)orb.start();
+      orb.setLevel(speechLevel());
+    }catch{
+      candidate?.dispose();
+      if(ticket!==orbRequest)return;
+      orbModule=null;
+      wave.setAttribute('aria-label','語音球無法顯示，按一下仍可播放旁白');
+      if(current==='welcome')controls.hidden=false;
+    }
+  }
+  function onOrbKey(event){
+    if(event.defaultPrevented||event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
+    if(event.key!=='9')return;
+    if(event.target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]'))return;
+    event.preventDefault();void setOrbEnabled(!orbEnabled);
+  }
   const controls=document.createElement('div');controls.className='voice-controls';controls.hidden=true;
   controls.innerHTML='<button type="button" class="voice-toggle">播放語音</button><button type="button" class="voice-replay">重播</button><span class="voice-error" role="status"></span>';document.getElementById('app').append(controls);
   const toggle=controls.querySelector('.voice-toggle'),error=controls.querySelector('.voice-error');
   const finish=document.createElement('button');finish.type='button';finish.className='voice-finish';finish.textContent='結束展演';finish.hidden=true;document.getElementById('app').append(finish);
-  finish.onclick=()=>{++request;clipQueue=[];audio.pause();resetClosing();showActive=false;orb.end();finish.hidden=true;};
+  finish.onclick=()=>{++request;clipQueue=[];audio.pause();resetClosing();showActive=false;orb?.end();finish.hidden=true;};
   const samples=new Float32Array(1024);
   function setup(){if(!context){context=new AudioContext();analyser=context.createAnalyser();analyser.fftSize=1024;source=context.createMediaElementSource(audio);source.connect(analyser);analyser.connect(context.destination);}return context;}
   async function play(){const ticket=request;try{await setup().resume();await cuePreparation;if(ticket!==request)return;await audio.play();error.textContent='';}catch{if(ticket===request)toggle.textContent='點此播放語音';}}
@@ -198,7 +228,7 @@ export function createNarration({navigate}){
   }
   audio.addEventListener('timeupdate',sync);audio.addEventListener('play',()=>toggle.textContent='暫停語音');audio.addEventListener('pause',()=>toggle.textContent='播放語音');
   audio.addEventListener('play',()=>{if(!showActive){showActive=true;if(orbReady)orb.start();}finish.hidden=false;});
-  audio.addEventListener('pause',()=>orb.setLevel(0));
+  audio.addEventListener('pause',()=>orb?.setLevel(0));
   audio.addEventListener('error',()=>{error.textContent='音檔載入失敗，請重播或重新整理';wave.setAttribute('aria-label','音檔載入失敗，按一下重試');});
   audio.addEventListener('ended',()=>{sync();if(clipQueue.length){loadClip(clipQueue.shift());play();return;}if(current==='welcome')navigate('intro');});
   toggle.onclick=()=>{if(closingHold){clearTimeout(closingTimer);closingTimer=null;closingHold=false;audio.playbackRate=.93;toggle.textContent='播放語音';return;}audio.paused?play():audio.pause();};wave.onclick=()=>{if(audio.getAttribute('src'))toggle.onclick();};controls.querySelector('.voice-replay').onclick=()=>{if(clipSequence.length){playClips(clipSequence);return;}resetClosing();audio.currentTime=0;sync();play();};
@@ -221,14 +251,16 @@ export function createNarration({navigate}){
     raf=requestAnimationFrame(draw);
   }
   draw();
-  window.addEventListener('pagehide',event=>{if(!event.persisted){clearInterval(voiceTimer);cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb.dispose();audio.pause();context?.close();}});
+  window.addEventListener('keydown',onOrbKey);
+  void setOrbEnabled(initialOrbEnabled);
+  window.addEventListener('pagehide',event=>{if(!event.persisted){++orbRequest;window.removeEventListener('keydown',onOrbKey);clearInterval(voiceTimer);cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb?.dispose();audio.pause();context?.close();}});
   return {enter(id){++request;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
     const file=files[id]||pageNarration[id]?.file;
     dock.hidden=id==='welcome';dock.dataset.page=id;dockCaption.textContent='';
     (id==='welcome'?welcomePage:dock).prepend(wave);
     wave.setAttribute('aria-label',file?'播放或暫停本頁旁白':'本頁語音球，旁白待加入');
     wave.setAttribute('aria-disabled',String(!file));
-    controls.hidden=!file||id==='welcome';
+    controls.hidden=!file||(id==='welcome'&&orbEnabled);
     if(!file){audio.removeAttribute('src');audio.load();return;}
     if(clipTranscripts[file]){playClips([file]);return;}
     audio.src=`./assets/narration/${file}`;cues=id==='welcome'?welcomeCaptions.map(([time])=>time):pageNarration[id]?.captions.map(([time])=>time)||[0,5,10];document.querySelector(`[data-page="${id}"]`).classList.add('voice-synced');sync();
