@@ -1,5 +1,5 @@
-// The approved renderer is lazy-loaded by the 9 key; off means no GPU drawing.
-const initialOrbEnabled = new URLSearchParams(location.search).get('orb') === 'on';
+// Default on; 9 toggles the approved renderer. ?orb=off skips GPU drawing at startup.
+const initialOrbEnabled = new URLSearchParams(location.search).get('orb') !== 'off';
 export const clipTranscripts = {
   'flood-drainage.mp3':[
     '建築配置雨水、廢水排水及抽水設備，在豪雨期間協助排除積水，',
@@ -120,16 +120,21 @@ export function createNarration({navigate}){
   let closingStarted=false,closingHold=false,closingTimer=null,watchFrame=null;
   let cuePreparation=Promise.resolve(),sentenceWeights=null;
   let clipQueue=[],clipSequence=[];
-  let activeClipLines=[];
+  let activeClipLines=[],activeTopic=null,activeClip=null,lastCaptionKey=null,clipGeneration=0,clipDuration=NaN;
   function loadClip(file){
     const ticket=request;
+    const generation=++clipGeneration;
+    clipDuration=NaN;
+    activeClip=file;lastCaptionKey=null;
     activeClipLines=clipTranscripts[file]||[];
     sentenceWeights=activeClipLines.map(line=>line.length);
     audio.src=`./assets/narration/${file}`;
-    cues=[0];dockCaption.textContent=activeClipLines[0]||'';
+    // Explicitly reset repeated/cached sources before publishing the first cue.
+    audio.load();
+    cues=[0];sync();
     const key=`clip:${file}`;
-    if(!cache.has(key))cache.set(key,fetch(audio.src).then(r=>{if(!r.ok)throw Error('audio');return r.arrayBuffer();}).then(bytes=>setup().decodeAudioData(bytes)).then(buffer=>findSentenceCues(buffer,clipTranscripts[file].map(line=>line.length))).catch(()=>null));
-    cuePreparation=cache.get(key).then(result=>{if(ticket===request&&result){sentenceWeights=null;cues=result;sync();}});
+    if(!cache.has(key))cache.set(key,fetch(audio.src).then(r=>{if(!r.ok)throw Error('audio');return r.arrayBuffer();}).then(bytes=>setup().decodeAudioData(bytes)).then(buffer=>({cues:findSentenceCues(buffer,clipTranscripts[file].map(line=>line.length)),duration:buffer.duration})).catch(()=>null));
+    cuePreparation=cache.get(key).then(result=>{if(ticket===request&&generation===clipGeneration&&result){sentenceWeights=null;cues=result.cues;clipDuration=result.duration;sync();}});
   }
   function playClips(files){
     ++request;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);
@@ -147,12 +152,13 @@ export function createNarration({navigate}){
   });
   window.addEventListener('narration:topic',event=>{
     if(current!=='prevention')return;
+    activeTopic=event.detail;
     const file={
       '防火區劃':'fire-compartment-v2.mp3','安全梯與避難':'fire-evacuation-v2.mp3','偵測與初期應變':'fire-detection-v2.mp3',
       '梁柱抗震':'quake-structure.mp3','結構與管線分離':'quake-pipes.mp3','地震感知與安全停靠':'quake-elevator.mp3',
       '窗框與玻璃':'typhoon-windows.mp3','外牆與結構':'typhoon-facade.mp3','樓板與排水界面':'typhoon-drainage.mp3',
       '排水與抽水':'flood-drainage.mp3','機電與備援':'flood-backup.mp3',
-      '基地風險':'slope-risk.mp3','結構異常觀察':'slope-observation.mp3','排水與地盤':'slope-drainage-v2.mp3',
+      '結構異常觀察':'slope-observation.mp3','排水與地盤':'slope-drainage-v2.mp3',
     }[event.detail];
     if(file){playClips([file]);return;}
     ++request;audio.pause();resetClosing();clipQueue=[];clipSequence=[];activeClipLines=[];
@@ -215,7 +221,26 @@ export function createNarration({navigate}){
     const total=sentenceWeights.reduce((sum,n)=>sum+n,0);let used=0;
     cues=sentenceWeights.map(n=>{const t=audio.duration*used/total;used+=n;return t;});sync();
   });
-  function sync(){const lines=document.querySelectorAll(current==='welcome'?'.welcome-captions > p':`[data-page="${current}"] .intro__roll > *`);let index=0;cues.forEach((t,i)=>{if(audio.currentTime>=t)index=i;});if(closingHold)index=1;lines.forEach((line,i)=>{line.classList.toggle('voice-current',i===index);line.setAttribute('aria-hidden',String(i!==index));});const captions=pageNarration[current]?.captions;dockCaption.textContent=activeClipLines[index]||captions?.[index]?.[1]||'';}
+  function sync(){
+    const lines=document.querySelectorAll(current==='welcome'?'.welcome-captions > p':`[data-page="${current}"] .intro__roll > *`);
+    let index=0;cues.forEach((t,i)=>{if(audio.currentTime>=t)index=i;});if(closingHold)index=1;
+    lines.forEach((line,i)=>{line.classList.toggle('voice-current',i===index);line.setAttribute('aria-hidden',String(i!==index));});
+    const captions=pageNarration[current]?.captions,text=activeClipLines[index]||captions?.[index]?.[1]||'';
+    dockCaption.textContent=text;
+    const key=`${request}:${current}:${activeTopic}:${activeClip}:${index}`;
+    if(text&&key!==lastCaptionKey){
+      lastCaptionKey=key;
+      const run=request;
+      const generation=clipGeneration;
+      // Local camera access only; no changes to Main/Pad WebSocket messages.
+      const readClock=()=>{
+        if(run!==request||generation!==clipGeneration)return null;
+        const end=cues[index+1]??(Number.isFinite(audio.duration)?audio.duration:clipDuration);
+        return {time:audio.currentTime,start:cues[index]??0,end,ready:cues.length>=activeClipLines.length&&Number.isFinite(end)};
+      };
+      window.dispatchEvent(new CustomEvent('narration:caption',{detail:{page:current,topic:activeTopic,clip:activeClip,run,index,text,readClock}}));
+    }
+  }
   function watchClosing(){
     if((current==='intro'||current==='outro')&&!audio.paused&&!closingStarted&&audio.currentTime>=cues[2]-.025){
       // Pause in place: seeking an MP3 here can restart playback on servers
@@ -230,7 +255,13 @@ export function createNarration({navigate}){
   audio.addEventListener('play',()=>{if(!showActive){showActive=true;if(orbReady)orb.start();}finish.hidden=false;});
   audio.addEventListener('pause',()=>orb?.setLevel(0));
   audio.addEventListener('error',()=>{error.textContent='音檔載入失敗，請重播或重新整理';wave.setAttribute('aria-label','音檔載入失敗，按一下重試');});
-  audio.addEventListener('ended',()=>{sync();if(clipQueue.length){loadClip(clipQueue.shift());play();return;}if(current==='welcome')navigate('intro');});
+  audio.addEventListener('ended',()=>{
+    if(!audio.ended)return;
+    sync();
+    if(clipQueue.length){loadClip(clipQueue.shift());play();return;}
+    window.dispatchEvent(new CustomEvent('narration:ended',{detail:{page:current,topic:activeTopic,clip:activeClip,run:request}}));
+    if(current==='welcome')navigate('intro');
+  });
   toggle.onclick=()=>{if(closingHold){clearTimeout(closingTimer);closingTimer=null;closingHold=false;audio.playbackRate=.93;toggle.textContent='播放語音';return;}audio.paused?play():audio.pause();};wave.onclick=()=>{if(audio.getAttribute('src'))toggle.onclick();};controls.querySelector('.voice-replay').onclick=()=>{if(clipSequence.length){playClips(clipSequence);return;}resetClosing();audio.currentTime=0;sync();play();};
   // Reuse the player's single audio graph. Silence changes level, never show state.
   function speechLevel(){
@@ -254,7 +285,7 @@ export function createNarration({navigate}){
   window.addEventListener('keydown',onOrbKey);
   void setOrbEnabled(initialOrbEnabled);
   window.addEventListener('pagehide',event=>{if(!event.persisted){++orbRequest;window.removeEventListener('keydown',onOrbKey);clearInterval(voiceTimer);cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb?.dispose();audio.pause();context?.close();}});
-  return {enter(id){++request;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
+  return {enter(id){++request;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];activeTopic=null;activeClip=null;lastCaptionKey=null;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
     const file=files[id]||pageNarration[id]?.file;
     dock.hidden=id==='welcome';dock.dataset.page=id;dockCaption.textContent='';
     (id==='welcome'?welcomePage:dock).prepend(wave);

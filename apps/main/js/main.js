@@ -794,7 +794,7 @@ const homeProgressEl = document.getElementById('home-progress');
 if (params.get('home-model') !== 'off') {
   if (homeLoadingEl) homeLoadingEl.hidden = false;
   viewer
-    .loadHomeModel('./models/tower.glb', (pct) => {
+    .loadHomeModel('./models/tower-line.glb', (pct) => {
       if (homeProgressEl) homeProgressEl.textContent = `${Math.round(pct)}%`;
     })
     .then(() => { if (homeLoadingEl) homeLoadingEl.hidden = true; showIdleFire(); })
