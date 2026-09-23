@@ -1,4 +1,4 @@
-// Default off; 9 toggles the unchanged approved renderer on this Pad.
+// Default on; 9 toggles the approved renderer. ?orb=off skips GPU drawing at startup.
 const host=document.getElementById('pad-voice-orb');
 const shell=host.closest('.pad-voice');
 const message=document.getElementById('pad-voice-status');
@@ -42,4 +42,4 @@ window.addEventListener('pad:voice',e=>{
 window.addEventListener('pagehide',e=>{
   if(!e.persisted){++request;window.removeEventListener('keydown',onKey);clearTimeout(timer);orb?.dispose();}
 });
-void setEnabled(new URLSearchParams(location.search).get('orb')==='on');
+void setEnabled(new URLSearchParams(location.search).get('orb')!=='off');

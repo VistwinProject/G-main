@@ -396,6 +396,7 @@ export class Viewer {
     this.sceneName = name;
     this._syncSceneVisibility();
     this._fly = null;                 // 換場景就取消接管與飛行，不然會飛到別頁去
+    this._informationMotion = null;
     this._hold = false;
     this._override = false;
     // 有真實模型就以它自動框好的視角為底，否則用佔位場景預設；存過的視角再蓋上去
@@ -742,6 +743,7 @@ export class Viewer {
     const m = this._blueprintMats;
     if (!m) return;
     const white = this._allWhite;
+    if(m.lineArt)m.lineArt.color.set(white?0xffffff:css('--m-edge', '#74d4ff'));
     const slab = css('--m-slab', '#e4efff');
     // 白模式：材質本身設純白，實際顏色交給頂點色的漸層（不然兩個顏色相乘會整個變暗）
     m.wall.color.set(white ? 0xffffff : css('--m-wall', '#123049'));
@@ -1393,6 +1395,37 @@ export class Viewer {
     const stair = mats.stair ?? slab;                         // 第一頁沒有獨立的樓梯材質，就跟樓板同一個
     const wallAngle = mats.wallEdgeAngle ?? 30;
     obj.traverse((o) => {
+      if(o.isLine){
+        // Native line-art geometry: do not regenerate edges or turn it into surfaces.
+        if(!mats.lineArt){
+          const depthRange={value:new THREE.Vector2(0,1)};
+          mats.lineArt=new THREE.LineBasicMaterial({color:new THREE.Color(css('--m-edge', '#74d4ff')),transparent:true,opacity:.8,depthWrite:false});
+          mats.lineArt.userData.depthRange=depthRange;
+          // Fade the native line drawing by camera-space depth, not world height.
+          // One material/draw call; no duplicated geometry or per-frame vertex edits.
+          mats.lineArt.onBeforeCompile=shader=>{
+            shader.uniforms.lineDepthRange=depthRange;
+            shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying float vLineDepth;')
+              .replace('#include <project_vertex>','#include <project_vertex>\nvLineDepth = -mvPosition.z;');
+            shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float vLineDepth;\nuniform vec2 lineDepthRange;')
+              .replace('#include <opaque_fragment>','diffuseColor.a *= mix(0.90, 0.15, smoothstep(lineDepthRange.x, lineDepthRange.y, vLineDepth));\n#include <opaque_fragment>');
+          };
+          mats.lineArt.customProgramCacheKey=()=> 'building-line-depth-v1';
+        }
+        o.material=mats.lineArt;o.userData.buildingLineArt=true;
+        o.geometry.computeBoundingBox();
+        const bounds=o.geometry.boundingBox;
+        const corners=[];
+        for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z));
+        const viewMatrix=new THREE.Matrix4(),point=new THREE.Vector3();
+        o.onBeforeRender=(_renderer,_scene,camera)=>{
+          viewMatrix.multiplyMatrices(camera.matrixWorldInverse,o.matrixWorld);
+          let near=Infinity,far=-Infinity;
+          for(const corner of corners){const depth=-point.copy(corner).applyMatrix4(viewMatrix).z;near=Math.min(near,depth);far=Math.max(far,depth);}
+          o.material.userData.depthRange.value.set(near,Math.max(near+.01,far));
+        };
+        return;
+      }
       if (!o.isMesh) return;
       const nm = o.material?.name;
       if (nm === 'wall-cut') { o.visible = false; return; }   // 剖面：挖掉靠近視角的兩面外牆
@@ -2385,6 +2418,8 @@ export class Viewer {
         const raw = Math.min(1, (t - f.t0) / f.dur);
         this._lerpView(f.from, f.to, raw * raw * (3 - 2 * raw));
         if (raw >= 1) { this._fly = null; f.onEnd?.(); }
+      } else if (this._informationMotion) {
+        this._informationMotion(t, this._motionPaused);
       } else if (this.swing.on && !this._motionPaused && !this._hold) {
         const w = Math.abs(this.controls.autoRotateSpeed) * 0.9;   // 快慢沿用自動旋轉速度那支
         if (this.swing.a && this.swing.b) {
