@@ -85,14 +85,12 @@ export const pageNarration = {
   home: {file:'route-intro.mp3', captions:[]},
   prevention: {file:null, captions:[]},
 };
-// Cue boundaries from the supplied 25.28-second WAV's sentence pauses.
+// Initial cue fallback; replaced by pause detection from the current recording.
 export const welcomeCaptions = [
-  [0, '危機發生時，最重要的是立刻知道該往哪裡走。'],
+  [0, '危機發生時，最重要的是知道該往哪裡走。'],
   [5.14, '接下來，你將進入火災逃生模擬。'],
   [8.74, '這個家會根據起火位置、煙霧方向與空間路徑，'],
-  [13.74, '即時計算出最安全的一條逃生路徑。'],
-  [17.24, '請跟隨螢幕、平板與燈光提示前進，'],
-  [21.42, '感受 AI 如何協助你避開危險。'],
+  [13.74, '讓危機中的每一步，都有清楚的指引。'],
 ];
 export function createNarrationPages(){
   const section=document.createElement('section');section.className='page page--welcome';section.dataset.page='welcome';
@@ -115,7 +113,7 @@ export function findSentenceCues(buffer, weights){
 }
 
 export function createNarration({navigate}){
-  const files={welcome:'welcome.wav',intro:'intro.mp3',outro:'outro-v2.mp3'};
+  const files={welcome:'welcome-v2.mp3',intro:'intro.mp3',outro:'outro-v2.mp3'};
   const audio=new Audio();audio.preload='auto';let context,analyser,source,current,raf,request=0;const cache=new Map();let cues=[0,5,10];
   let closingStarted=false,closingHold=false,closingTimer=null,watchFrame=null;
   let cuePreparation=Promise.resolve(),sentenceWeights=null;
@@ -295,9 +293,9 @@ export function createNarration({navigate}){
     if(!file){audio.removeAttribute('src');audio.load();return;}
     if(clipTranscripts[file]){playClips([file]);return;}
     audio.src=`./assets/narration/${file}`;cues=id==='welcome'?welcomeCaptions.map(([time])=>time):pageNarration[id]?.captions.map(([time])=>time)||[0,5,10];document.querySelector(`[data-page="${id}"]`).classList.add('voice-synced');sync();
-    if(id==='intro'||id==='outro'){
-      watchClosing();
-      const text=[...document.querySelectorAll(`[data-page="${id}"] .intro__roll > *`)].map(el=>el.textContent.replace(/\s/g,'').length);
+    if(id==='welcome'||id==='intro'||id==='outro'){
+      if(id!=='welcome')watchClosing();
+      const text=id==='welcome'?welcomeCaptions.map(([,line])=>line.length):[...document.querySelectorAll(`[data-page="${id}"] .intro__roll > *`)].map(el=>el.textContent.replace(/\s/g,'').length);
       sentenceWeights=text;
       if(!cache.has(id))cache.set(id,fetch(audio.src).then(r=>{if(!r.ok)throw Error('audio');return r.arrayBuffer();}).then(bytes=>setup().decodeAudioData(bytes)).then(buffer=>findSentenceCues(buffer,text)).catch(()=>null));
       cuePreparation=cache.get(id).then(result=>{if(ticket===request&&result){sentenceWeights=null;cues=result;sync();}});
