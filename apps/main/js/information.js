@@ -514,5 +514,12 @@ export function createInformation(viewer){
     // Resizing used to click Overview and cancel the subtitle director permanently.
     if(story?.refocus)story.refocus();else if(!story)overview.click();
   },180);});
-  return {catalog:disasters.map(d=>({name:d.name,topics:d.topics.map(t=>t[0])})),select(choice){const di=disasters.findIndex(d=>d.name===choice?.disaster);if(di<0)return;const ti=disasters[di].topics.findIndex(t=>t[0]===choice?.topic);if(ti<0)return;requestedTopic=ti;nav.children[di].click();},enter(){sizeStage();if(viewer.customModels.tower)overview.click();}};
+  return {catalog:disasters.map(d=>({name:d.name,topics:d.topics.map(t=>t[0])})),select(choice){const di=disasters.findIndex(d=>d.name===choice?.disaster);if(di<0)return;const ti=disasters[di].topics.findIndex(t=>t[0]===choice?.topic);if(ti<0)return;requestedTopic=ti;nav.children[di].click();},enter(){
+    sizeStage();
+    // Open a real topic on entry so both Main and Pad receive its explanation.
+    const activeDisaster=Array.from(nav.children).find(b=>b.getAttribute('aria-pressed')==='true');
+    const activeTopic=panel.querySelector('.information-topics button[aria-pressed="true"]');
+    requestedTopic=activeTopic?Array.from(activeTopic.parentElement.children).indexOf(activeTopic):0;
+    (activeDisaster||nav.children[0])?.click();
+  }};
 }
