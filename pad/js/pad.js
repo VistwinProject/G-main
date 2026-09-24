@@ -329,7 +329,7 @@ function renderPreventionPicker(s){
 }
 function selectPrevention(disaster,topic){
   if(!sync.isOpen()){toast('尚未連上主螢幕，請確認連線後再選題。');return;}
-  render({...lastPadState,scene:'prevention',prevention:{disaster,topic,description:'等待主螢幕回傳科普說明，請保持 Main 頁面開啟。',action:''}});
+  render({...lastPadState,scene:'prevention',prevention:{disaster,topic,description:'等待主螢幕回傳科普說明，請保持主螢幕頁面開啟。',action:''}});
   cmdSeq+=1;
   sync.send({scene:'prevention',cmd:'prevention-select',cmdId:cmdTag+'-'+cmdSeq,preventionChoice:{disaster,topic},now:Date.now()});
 }
