@@ -274,6 +274,15 @@ document.addEventListener('animationend', (e) => {
   if (e.animationName === 'padTap') els.body.classList.remove('is-buzz');
 });
 
+// Keep the chooser available before Main sends its first catalog (e.g. relay restart).
+// Main's live catalog remains authoritative once received.
+const initialPreventionCatalog=[
+  {name:'火災',topics:['防火區劃','安全梯與避難','偵測與初期應變']},
+  {name:'地震',topics:['梁柱抗震','結構與管線分離','地震感知與安全停靠']},
+  {name:'颱風',topics:['窗框與玻璃','外牆與結構','樓板與排水界面']},
+  {name:'暴雨／淹水',topics:['排水與抽水','機電與備援']},
+  {name:'坡地／土砂',topics:['結構異常觀察','排水與地盤']},
+];
 let preventionCatalog=[],selectedPrevention=null,catalogKey='',lastPadState={};
 function togglePageMenu(open){$('page-menu').hidden=!open;$('page-menu-toggle').setAttribute('aria-expanded',String(open));}
 $('page-menu-toggle').onclick=()=>togglePageMenu($('page-menu').hidden);
@@ -288,10 +297,11 @@ document.querySelectorAll('[data-scene]').forEach(button=>button.onclick=()=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape')togglePageMenu(false);});
 function renderPreventionPicker(s){
   selectedPrevention=s?.prevention;
-  if(Array.isArray(s?.preventionCatalog)){
-    const key=JSON.stringify(s.preventionCatalog);
+  const incoming=Array.isArray(s?.preventionCatalog)&&s.preventionCatalog.length?s.preventionCatalog:(preventionCatalog.length?preventionCatalog:initialPreventionCatalog);
+  if(incoming){
+    const key=JSON.stringify(incoming);
     if(key!==catalogKey){
-      catalogKey=key;preventionCatalog=s.preventionCatalog;
+      catalogKey=key;preventionCatalog=incoming;
       const root=document.querySelector('.prevention-disasters');root.replaceChildren();
       preventionCatalog.forEach(d=>{
         const b=document.createElement('button');b.type='button';b.textContent=d.name;
@@ -303,7 +313,9 @@ function renderPreventionPicker(s){
     const active=b.textContent===selectedPrevention?.disaster;
     b.classList.toggle('is-selected',active);b.setAttribute('aria-pressed',String(active));
   });
-  const root=$('p-topic-buttons'),disaster=preventionCatalog.find(d=>d.name===selectedPrevention?.disaster);
+  // On first entering 04 there may not yet be a selected topic from Main.
+  // Still expose the first disaster's topics instead of hiding every choice.
+  const root=$('p-topic-buttons'),disaster=preventionCatalog.find(d=>d.name===selectedPrevention?.disaster)||preventionCatalog[0];
   const key=disaster?.name||'';
   if(root.dataset.disaster!==key){
     root.dataset.disaster=key;root.replaceChildren();
@@ -317,6 +329,7 @@ function renderPreventionPicker(s){
 }
 function selectPrevention(disaster,topic){
   if(!sync.isOpen()){toast('尚未連上主螢幕，請確認連線後再選題。');return;}
+  render({...lastPadState,scene:'prevention',prevention:{disaster,topic,description:'等待主螢幕回傳科普說明，請保持 Main 頁面開啟。',action:''}});
   cmdSeq+=1;
   sync.send({scene:'prevention',cmd:'prevention-select',cmdId:cmdTag+'-'+cmdSeq,preventionChoice:{disaster,topic},now:Date.now()});
 }
