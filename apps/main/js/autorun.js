@@ -15,10 +15,12 @@
    ========================================================================= */
 
 // 實測的旁白長度（秒）。換了音檔要重量。
-const NARRATION = { welcome: 17.6, routeIntro: 8.86, outro: 12.82 };
+const NARRATION = { welcome: 17.6, intro: 11.23, routeIntro: 8.86, outro: 12.82 };
 
 const STEP = {
-  welcomeHold: 1.4,     // 開場旁白跑完再停多久
+  welcomeMax: 30,       // 等 welcome 自己接到 intro 最久等多久（音檔要下載＋解碼，會比 17.6 秒晚）
+  introHold: 2.2,       // 前言頁旁白之後的緩衝。⚠️ 要留夠：narration 在最後一句前會停 0.5 秒，
+                        //    之後還用 0.93 倍速播，實際比音檔長度長一些
   countdown: 32,        // 黃金30秒：倒數 30 秒 + 收尾
   routeIntroHold: 1.2,  // 動線頁進場旁白之後的緩衝
   routeCount: 2,        // 隨機示範幾條動線
@@ -29,7 +31,7 @@ const STEP = {
   topicSettle: 1.6,     // 點了災害之後等主題按鈕長出來
   topicHold: 26,        // 每個主題停多久（最長的 fire-evacuation 是 24.98 秒）
   preventionEnter: 3,   // 進科普頁等模型載入
-  outroHold: 1.4,
+  outroHold: 2.2,       // 結語頁跟前言頁一樣有收尾停頓＋0.93 倍速，緩衝要留夠
 };
 
 const STOP = Symbol('stop');
@@ -60,6 +62,7 @@ async function until(test, maxSeconds, mine) {
 
 const go = (page) => window.__goto?.(page);
 const isGreen = () => document.documentElement.dataset.theme === 'green';
+const page = () => document.querySelector('.page.is-active')?.dataset.page;
 
 function setRunning(on) {
   if (!button) return;
@@ -78,9 +81,17 @@ async function play() {
   const mine = ++current;
   setRunning(true);
   try {
-    // 01 前言介紹
+    // 01 前言介紹＝**兩頁**：welcome（開場）旁白播完，narration.js 會自己 navigate('intro')。
+    //    導覽上的 01 對這兩頁都會亮（main.js 的 goto 有特別處理），所以只播 welcome 等於沒演完。
+    // ⚠️ 不要用計時等 welcome —— 音檔要先下載 + decodeAudioData 算字幕斷點，真正開始播的時間
+    //    比 17.6 秒的長度晚，計時一定會提早切走。改成**等它自己換頁到 intro**。
+    // ⚠️ 按下按鈕時常常本來就停在 welcome，那時 goto() 會因為 id === current 直接 return，
+    //    旁白**不會從頭播**，開場就等於演一半。所以這種情況改叫 narration 的「重播」。
+    const onWelcome = page() === 'welcome';
     go('welcome');
-    await sleep(NARRATION.welcome + STEP.welcomeHold, mine);
+    if (onWelcome) document.querySelector('.voice-replay')?.click();
+    if (!(await until(() => page() === 'intro', STEP.welcomeMax, mine))) go('intro');  // 旁白沒播成功就自己接手
+    await sleep(NARRATION.intro + STEP.introHold, mine);
 
     // 02 黃金30秒：倒數自己會跑，等它一輪
     // ⚠️ 倒數跑完 main.js 本來就會自動跳首頁（onEnd → WELCOME_TO），比這裡早約 2 秒。
