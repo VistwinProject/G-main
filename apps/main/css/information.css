@@ -24,3 +24,15 @@
 [data-skin="light"] .information-panel .information-action{color:#16713d}
 .information-panel .detection-note{margin-top:auto;font-size:1.2rem;color:var(--ink-2);line-height:1.5}
 .detection-note[hidden]{display:none}
+
+/* 自動展演的開關，放在頁面導覽最前面。
+   ⚠️ 它是 js/autorun.js 在執行期 prepend 進 .page-nav 的，不在 information.js 的按鈕清單裡，
+      所以不會吃到 [data-go-page] 的 aria-current 樣式，狀態自己用 .is-running 表示。 */
+.page-nav .autorun-toggle{
+  gap:.4rem;color:var(--brand-hi);border-color:var(--brand-line);
+  border-right:1px solid var(--brand-line);margin-right:.25rem;
+}
+.page-nav .autorun-toggle:hover{background:var(--brand-soft)}
+.page-nav .autorun-toggle.is-running{
+  color:var(--bg-0);background:var(--brand-hi);border-color:var(--brand-hi);
+}
