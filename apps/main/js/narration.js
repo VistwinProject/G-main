@@ -1,5 +1,6 @@
 // Default on; 9 toggles the approved renderer. ?orb=off skips GPU drawing at startup.
 const initialOrbEnabled = new URLSearchParams(location.search).get('orb') !== 'off';
+const muted = new URLSearchParams(location.search).get('mute') === '1';
 export const clipTranscripts = {
   'flood-drainage.mp3':[
     '建築配置雨水、廢水排水及抽水設備，在豪雨期間協助排除積水，',
@@ -114,8 +115,9 @@ export function findSentenceCues(buffer, weights){
 
 export function createNarration({navigate}){
   const files={welcome:'welcome-v2.mp3',intro:'intro.mp3',outro:'outro-v2.mp3'};
-  const audio=new Audio();audio.preload='auto';let context,analyser,source,current,raf,request=0;const cache=new Map();let cues=[0,5,10];
+  const audio=new Audio();audio.preload='auto';audio.muted=muted;let context,analyser,source,current,raf,request=0;const cache=new Map();let cues=[0,5,10];
   let closingStarted=false,closingHold=false,closingTimer=null,watchFrame=null;
+  let completion=null,explicitlyStopped=false;
   let cuePreparation=Promise.resolve(),sentenceWeights=null;
   let clipQueue=[],clipSequence=[];
   let activeClipLines=[],activeTopic=null,activeClip=null,lastCaptionKey=null,clipGeneration=0,clipDuration=NaN;
@@ -209,10 +211,11 @@ export function createNarration({navigate}){
   controls.innerHTML='<button type="button" class="voice-toggle">播放語音</button><button type="button" class="voice-replay">重播</button><span class="voice-error" role="status"></span>';document.getElementById('app').append(controls);
   const toggle=controls.querySelector('.voice-toggle'),error=controls.querySelector('.voice-error');
   const finish=document.createElement('button');finish.type='button';finish.className='voice-finish';finish.textContent='結束展演';finish.hidden=true;document.getElementById('app').append(finish);
-  finish.onclick=()=>{++request;clipQueue=[];audio.pause();resetClosing();showActive=false;orb?.end();finish.hidden=true;};
+  function stop(){++request;completion=null;explicitlyStopped=true;clipQueue=[];audio.pause();resetClosing();cancelAnimationFrame(watchFrame);showActive=false;orb?.end();finish.hidden=true;}
+  finish.onclick=stop;
   const samples=new Float32Array(1024);
-  function setup(){if(!context){context=new AudioContext();analyser=context.createAnalyser();analyser.fftSize=1024;source=context.createMediaElementSource(audio);source.connect(analyser);analyser.connect(context.destination);}return context;}
-  async function play(){const ticket=request;try{await setup().resume();await cuePreparation;if(ticket!==request)return;await audio.play();error.textContent='';}catch{if(ticket===request)toggle.textContent='點此播放語音';}}
+  function setup(){if(!context){context=new AudioContext();analyser=context.createAnalyser();analyser.fftSize=1024;source=context.createMediaElementSource(audio);source.connect(analyser);const gain=context.createGain();gain.gain.value=muted?0:1;analyser.connect(gain);gain.connect(context.destination);}return context;}
+  async function play(){const ticket=request;completion=null;explicitlyStopped=false;try{await setup().resume();await cuePreparation;if(ticket!==request)return;await audio.play();error.textContent='';}catch{if(ticket===request)toggle.textContent='點此播放語音';}}
   // If analysis fails, derive fallback cues from the real duration, never 10 seconds.
   audio.addEventListener('loadedmetadata',()=>{
     if(!sentenceWeights||!Number.isFinite(audio.duration))return;
@@ -257,6 +260,7 @@ export function createNarration({navigate}){
     if(!audio.ended)return;
     sync();
     if(clipQueue.length){loadClip(clipQueue.shift());play();return;}
+    completion={page:current,run:request,at:Date.now(),evidence:'HTMLMediaElement.ended'};
     window.dispatchEvent(new CustomEvent('narration:ended',{detail:{page:current,topic:activeTopic,clip:activeClip,run:request}}));
     if(current==='welcome')navigate('intro');
   });
@@ -283,7 +287,10 @@ export function createNarration({navigate}){
   window.addEventListener('keydown',onOrbKey);
   void setOrbEnabled(initialOrbEnabled);
   window.addEventListener('pagehide',event=>{if(!event.persisted){++orbRequest;window.removeEventListener('keydown',onOrbKey);clearInterval(voiceTimer);cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb?.dispose();audio.pause();context?.close();}});
-  return {enter(id){++request;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];activeTopic=null;activeClip=null;lastCaptionKey=null;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
+  return {stop,getStatus(){return {page:current,run:request,paused:audio.paused,stopped:explicitlyStopped&&audio.paused&&!closingHold,
+    finished:!!completion&&completion.run===request&&completion.page===current&&audio.ended&&clipQueue.length===0,
+    completion};},enter(id,{autoplay=true}={}){++request;completion=null;explicitlyStopped=!autoplay;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];activeTopic=null;activeClip=null;lastCaptionKey=null;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
+    if(!autoplay){showActive=false;orb?.end();finish.hidden=true;}
     const file=files[id]||pageNarration[id]?.file;
     dock.hidden=id==='welcome';dock.dataset.page=id;dockCaption.textContent='';
     (id==='welcome'?welcomePage:dock).prepend(wave);
@@ -291,15 +298,15 @@ export function createNarration({navigate}){
     wave.setAttribute('aria-disabled',String(!file));
     controls.hidden=!file||(id==='welcome'&&orbEnabled);
     if(!file){audio.removeAttribute('src');audio.load();return;}
-    if(clipTranscripts[file]){playClips([file]);return;}
+    if(clipTranscripts[file]){if(autoplay)playClips([file]);else loadClip(file);return;}
     audio.src=`./assets/narration/${file}`;cues=id==='welcome'?welcomeCaptions.map(([time])=>time):pageNarration[id]?.captions.map(([time])=>time)||[0,5,10];document.querySelector(`[data-page="${id}"]`).classList.add('voice-synced');sync();
     if(id==='welcome'||id==='intro'||id==='outro'){
-      if(id!=='welcome')watchClosing();
+      if(id!=='welcome'&&autoplay)watchClosing();
       const text=id==='welcome'?welcomeCaptions.map(([,line])=>line.length):[...document.querySelectorAll(`[data-page="${id}"] .intro__roll > *`)].map(el=>el.textContent.replace(/\s/g,'').length);
       sentenceWeights=text;
       if(!cache.has(id))cache.set(id,fetch(audio.src).then(r=>{if(!r.ok)throw Error('audio');return r.arrayBuffer();}).then(bytes=>setup().decodeAudioData(bytes)).then(buffer=>findSentenceCues(buffer,text)).catch(()=>null));
       cuePreparation=cache.get(id).then(result=>{if(ticket===request&&result){sentenceWeights=null;cues=result;sync();}});
     }
-    play();
+    if(autoplay)play();
   }};
 }

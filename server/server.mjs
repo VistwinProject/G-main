@@ -6,6 +6,7 @@ import { extname, join, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
+import { createXControl } from './x-control.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PORT = Number(process.argv[2] ?? process.env.PORT ?? 5280);
@@ -50,6 +51,9 @@ const server = createServer(async (req, res) => {
       res.writeHead(403).end('Forbidden'); return;
     }
     const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    if (path === '/health' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify(xControl.status())); return;
+    }
     if (path === '/' || path === '/main' || path === '/pad') {
       if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405).end(); return; }
       res.writeHead(302, { Location: (path === '/' ? '/main/' : path + '/') + query }).end();
@@ -139,6 +143,7 @@ function wsFrame(str) {
 
 const wsSend = (c, obj) => { try { c.socket.write(wsFrame(JSON.stringify(obj))); } catch { /* 對面斷了 */ } };
 const wsPing = (c) => { try { c.socket.write(Buffer.from([0x89, 0])); } catch { /* 對面斷了 */ } };
+const xControl = createXControl({ clients, send: wsSend, snapshot: () => state });
 
 function broadcast(obj, except) {
   for (const c of clients) if (c !== except) wsSend(c, obj);
@@ -161,6 +166,7 @@ server.on('upgrade', (req, socket) => {
   clients.add(c);
   console.log(`[ws] + ${c.role} 連上（目前 ${clients.size} 台）`);
   wsSend(c, state);                                  // 一連上就先給目前狀態
+  if (c.role === 'x-controller') wsSend(c, xControl.status());
 
   let buf = Buffer.alloc(0);
   socket.on('data', (chunk) => {
@@ -182,13 +188,14 @@ server.on('upgrade', (req, socket) => {
       if (mask) for (let i = 0; i < payload.length; i++) payload[i] ^= mask[i & 3];
       buf = buf.subarray(off + len);
 
-      if (op === 0x8) { socket.end(); return; }       // close
+      if (op === 0x8) { socket.end(Buffer.from([0x88, 0])); return; } // close handshake
       if (op === 0x9) { socket.write(Buffer.from([0x8a, 0])); continue; }   // ping → pong
       if (op === 0xa) { c.alive = true; continue; }   // pong
       if (op !== 0x1) continue;                       // 只收文字
 
       let msg; try { msg = JSON.parse(payload.toString('utf8')); } catch { continue; }
       if (!msg || typeof msg !== 'object') continue;
+      if (xControl.handle(c, msg)) continue;
       if (msg.type === 'hello') { wsSend(c, state); continue; }
       if(msg.type==='voice'){
         if(c.role==='display')broadcast({type:'voice',active:!!msg.active,level:Math.max(0,Math.min(1,Number(msg.level)||0))},c);
@@ -203,6 +210,7 @@ server.on('upgrade', (req, socket) => {
 
   const bye = () => {
     if (!clients.delete(c)) return;
+    xControl.disconnected(c);
     console.log(`[ws] − ${c.role} 離線（剩下 ${clients.size} 台）`);
   };
   socket.on('close', bye);

@@ -46,7 +46,7 @@ export function createSync({ role = 'pad', host: at = null, onState = null, onSt
     };
     ws.onmessage = (e) => {
       let s; try { s = JSON.parse(e.data); } catch { return; }
-      if (s && typeof s === 'object' && !s.type) onState?.(s);
+      if (s && typeof s === 'object' && (!s.type || s.type === 'x-command')) onState?.(s);
     };
     ws.onclose = () => { onStatus?.(false); schedule(); };
     ws.onerror = () => { try { ws.close(); } catch { /* 已經關了 */ } };

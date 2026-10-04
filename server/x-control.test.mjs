@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createXControl } from './x-control.mjs';
+
+test('controller commands require one ready display; ACK is correlated, deduplicated and never cached as state', () => {
+  const x = { role: 'x-controller' }, display = { role: 'display' }, pad = { role: 'pad' };
+  const clients = new Set([x, display, pad]);
+  const packets = [];
+  const state = { scene: 'intro' };
+  const control = createXControl({ clients, send: (c, msg) => packets.push({ c, msg }), snapshot: () => state });
+  const send = (id, scene = 'aiRoute') => control.handle(x, { requestId: id, scene });
+  send('offline'); assert.equal(packets.at(-1).msg.error, 'display-not-ready');
+  control.handle(display, { type: 'x-display-status', ready: true, page: 'intro', experience: 'idle' });
+  assert.equal(control.status().ready, true);
+  assert.equal(control.status().display.experience, 'idle', 'relay preserves display lifecycle evidence');
+  send('unsupported', 'bogus'); assert.equal(packets.at(-1).msg.error, 'unsupported-command');
+  send('a'); assert.equal(packets.at(-1).c, display); assert.equal(packets.at(-1).msg.controlId, 'a');
+  assert.deepEqual(state, { scene: 'intro' });
+  send('busy'); assert.equal(packets.at(-1).msg.error, 'display-busy');
+  const before = packets.length;
+  control.handle(pad, { type: 'x-ack', requestId: 'a', ok: true });
+  assert.equal(packets.length, before, 'Pad cannot acknowledge display execution');
+  control.handle(display, { type: 'x-ack', requestId: 'a', ok: true, scene: 'aiRoute', rendered: true });
+  assert.equal(packets.at(-1).msg.status, 'applied');
+  send('a'); assert.equal(packets.at(-1).c, x); assert.equal(packets.at(-1).msg.status, 'applied');
+  send('b'); clients.delete(display); control.disconnected(display);
+  assert.ok(packets.some(p => p.msg.requestId === 'b' && p.msg.error === 'display-disconnected'));
+  assert.equal(control.status().ready, false);
+  clients.add(display); display.displayStatus.ts = Date.now() - 11000;
+  assert.equal(control.status().ready, false, 'stale ready expires');
+  display.displayStatus.ts = Date.now(); clients.add({ role: 'display', displayStatus: { ready: true, ts: Date.now() } });
+  send('ambiguous'); assert.equal(packets.at(-1).msg.error, 'multiple-displays');
+});

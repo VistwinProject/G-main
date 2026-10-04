@@ -5,6 +5,8 @@ import { createCountdown } from './countdown.js';
 import { createEditor } from './editor.js';
 import { createSync } from './sync.js';
 import { createGuideStore } from './guides.js';
+import { renderControlFrame } from './control-render.js';
+import { experienceStatus } from './experience.js';
 
 /* =========================================================
    頁面路由
@@ -81,6 +83,7 @@ let padCmdReady = false;
 const sync = createSync({
   role: 'display',
   onState: (s) => {
+    if (s?.type === 'x-command') { applyXCommand(s); return; }
     // Record the relay snapshot even while the opening blocks navigation.
     // Otherwise the first genuine Pad command after opening is discarded.
     if(!padCmdReady){padCmdReady=true;padCmdSeen=s?.cmdId??null;}
@@ -358,13 +361,63 @@ const closeEditors = (except) => {
 };
 
 const params = new URLSearchParams(location.search);
+const modelReady = { flat: false, tower: false };
+let lastControl = null;
+if (params.get('mute') === '1') {
+  const badge = document.createElement('div');
+  badge.textContent = 'G 區靜音測試 · MUTE';
+  badge.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:99999;background:#123;color:white;padding:6px 10px;font:12px sans-serif;pointer-events:none';
+  document.body.append(badge);
+}
 let current = null;
 const narration = createNarration({navigate: goto});
 
-function goto(id, {remote=false} = {}) {
-  if (!pageEls.has(id) || id === current) return;
+function displayStatus() {
+  const active = document.querySelector('.page.is-active');
+  const canvas = active?.querySelector('canvas');
+  const rect = canvas?.getBoundingClientRect();
+  const contextHealthy = !viewer.renderer.getContext().isContextLost();
+  const rendered = contextHealthy && (current === 'welcome' || !!(rect?.width && rect?.height));
+  const lifecycle = experienceStatus({page:current,narration:narration.getStatus(),autorun:document.documentElement.classList.contains('is-autorun')});
+  return { type: 'x-display-status', ready: !!current && rendered && modelReady.flat && modelReady.tower && !document.documentElement.classList.contains('is-booting'),
+    page: current, scene: SCENE[current], phase: routeState, route: lastRoute, rendered, models: { ...modelReady }, muted: params.get('mute') === '1',
+    visibility: document.visibilityState, lastControl, experience:lifecycle.experience, experienceEvidence:lifecycle };
+}
+function applyXCommand(s) {
+  const receivedAt = Date.now();
+  try {
+    if (!displayStatus().ready) throw Error('display-not-ready');
+    const reset = s.scene === 'intro' || s.scene === 'welcome';
+    const page = reset ? 'intro' : SCENE_PAGE[s.scene];
+    if (!page) throw Error('unsupported-scene');
+    window.__autorun?.stop();
+    if (reset) narration.stop();
+    if (page === 'home' || reset) resetRouteDemo();
+    lastRoute = -1;
+    goto(page, { remote: true, autoplay: !reset });
+    if (reset) { countdown.pause(); anim = null; clearTimeout(introTimer); stopIntroSpark(); }
+    if (page === 'first') countdown.reset();
+    const evidence = renderControlFrame(viewer, document.querySelector('.page.is-active'), page, document.visibilityState);
+    const actual = displayStatus();
+    if (actual.page !== page || !actual.rendered) throw Error('page-not-rendered');
+    if (reset && actual.experience !== 'idle') throw Error('reset-not-idle');
+    lastControl = { requestId: s.controlId, requestedScene:s.scene, scene: actual.scene, reset, receivedAt, appliedAt: Date.now(), elapsedMs: Date.now() - receivedAt, evidence };
+    pushSync();
+    sync.send(displayStatus());
+    sync.send({ type: 'x-ack', requestId: s.controlId, ok: true, scene: actual.scene, page, rendered: true, muted: actual.muted });
+  } catch (error) {
+    lastControl = { requestId: s.controlId, receivedAt, failedAt: Date.now(), error: error.message, visibility: document.visibilityState };
+    sync.send({ type: 'x-ack', requestId: s.controlId, ok: false, error: error.message });
+    sync.send(displayStatus());
+  }
+}
+setInterval(() => { sync.send(displayStatus()); pushSync(); }, 2000);
+
+function goto(id, {remote=false,autoplay=true} = {}) {
+  if (!pageEls.has(id)) return;
+  if (id === current) { if(!autoplay)narration.enter(id,{autoplay:false}); return; }
   current = id;
-  narration.enter(id);
+  narration.enter(id,{autoplay});
   document.getElementById('app').classList.toggle('showing-welcome', id === 'welcome');
   for (const [key, el] of pageEls) el.classList.toggle('is-active', key === id);
   document.querySelectorAll('[data-go-page]').forEach(button => {
@@ -393,7 +446,7 @@ function goto(id, {remote=false} = {}) {
     viewer.setRouteBoost('flat', faded);
     viewer.mount(host);
     if(id==='prevention')information.enter();
-    if (id === 'intro') startIntroSpark();       // 進前言頁：換一條起火點，之後每 5 秒再換
+    if (id === 'intro' && autoplay) startIntroSpark(); // X reset keeps the intro idle.
     else stopIntroSpark();
     // 結語頁：動線**多久換一條**要對到上面文字**多久換一段**。
     // 兩件事得一起重來才會同步 —— 文字的動畫從頭跑一次，動線的格子也歸零。
@@ -409,7 +462,7 @@ function goto(id, {remote=false} = {}) {
 
   // 前言頁停一下自動進「火災黃金30秒」；手動切走就取消，而且只跳這一次
   clearTimeout(introTimer);
-  if (id === INTRO_FROM && !introDone && INTRO_HOLD > 0) {
+  if (autoplay && id === INTRO_FROM && !introDone && INTRO_HOLD > 0) {
     introTimer = setTimeout(() => {
       // 編輯版面時不要把人踢走（跟倒數的 onEnd 同一套判斷）
       if (introDone || current !== INTRO_FROM || editors[current]?.isEditing()) return;
@@ -797,7 +850,7 @@ if (params.get('home-model') !== 'off') {
     .loadHomeModel('./models/tower-line.glb', (pct) => {
       if (homeProgressEl) homeProgressEl.textContent = `${Math.round(pct)}%`;
     })
-    .then(() => { if (homeLoadingEl) homeLoadingEl.hidden = true; showIdleFire(); })
+    .then(() => { modelReady.tower = true; if (homeLoadingEl) homeLoadingEl.hidden = true; showIdleFire(); })
     .catch((err) => {
       console.error('[viewer] 首頁模型載入失敗，退回佔位大樓', err);
       if (homeLoadingEl) homeLoadingEl.hidden = true;
@@ -810,7 +863,7 @@ if (params.get('flat-model') !== 'off') {
   setLoading(true);
   viewer
     .loadFlatModel('./models/flat.glb', (pct) => setLoading(true, pct))
-    .then(() => { setLoading(false); hintEl.style.opacity = '0'; })
+    .then(() => { modelReady.flat = true; setLoading(false); hintEl.style.opacity = '0'; })
     .catch((err) => {
       console.error('[viewer] 第一頁模型載入失敗，退回佔位平面圖', err);
       setLoading(false);

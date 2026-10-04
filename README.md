@@ -107,4 +107,25 @@ npm test
 - Main 原 CSS 在窄直式比例下隱藏 3D，主展示請用橫向視窗。未修改此原有行為。
 - 同瀏覽器同 origin 的兩頁仍沿用 skin 儲存鍵，重整時可能讀到彼此最後選的深淺色；跨装置不受此影響。未為此重構前端。
 - 伺服器沿用無驗證的 LAN 同步／編輯機制，僅供信任的展演網路；不要直接暴露到公網。
-- 原有 WebSocket 僅支援未分片文字訊框、close 行為等限制保留；沒有進入協定統一、ACK 或狀態恢復重構。
+- 原有 WebSocket 僅支援未分片文字訊框；G 控制已增加展示 ACK 與 close handshake，但不提供伺服器重啟後的持久化播放恢復。
+
+## X 控制與靜音驗證（2026-10-05）
+
+- 展示靜音入口 `/main/?mute=1`：旁白媒體靜音、輸出 Gain 為 0，畫面顯示 MUTE 標記。Pad 本身不播放音效。
+- `/health` 回傳 `g-control/1`、display ready、實際 scene/page/phase、模型載入及 muted 狀態。
+- X 維持連 `/ws?role=x-controller`，送 `{scene:'golden30',requestId:'唯一識別碼'}`。舊版無 requestId 的四種 scene 封包仍相容，伺服器會補 ID。
+- 支援 `welcome`、`intro`、`golden30`、`aiRoute`、`prevention`、`outro`。控制會中止自動展演；X 的 welcome/intro 皆為 reset：停止旁白、倒數及原動線，顯示 intro 待機，不自播。aiRoute 只進頁面，動線仍由 Main／Pad 按鈕啟動。
+- 收到 `x-status` 且 ready=true 才代表唯一展示端已初始化；WS open 不代表 ready。
+- `x-ack` 的 `status:'applied',ok:true` 由展示頁切換後，主動呼叫 WebGL renderer，確認 frame 增加且 draw calls > 0 才回覆；不再等待背景分頁可能暫停的 rAF。welcome 無 3D，單獨核對 DOM layout。`display.lastControl` 記錄 requestId、處理時長、實際 render 證據及分頁 visibility；背景分頁的 outputVisible=false。這證明頁面應用命令並提交 WebGL 繪製，並非實體投影機、合成器呈現或聲音設備確認。
+- 無展示／多展示／忙碌／非法場景會拒絕；展示 ACK 5 秒逾時，逾時不代表沒有執行。requestId 最近 128 筆結果在記憶體去重，X 指令不進重連快取，不會重播。
+- ready 心跳 2 秒、10 秒過期。Main／Pad 原自動重連 1.5 秒；X adapter 建議 3 秒。重啟 G server 仍使用預設狀態；完整重新載入 Main 仍保留原開場流程。
+- `npm test` 包含隔離 HTTP/WS 回歸及 X 控制邊界測試；不對 5280 注入自動回歸資料。
+
+### 體驗狀態（供 X 切區判斷）
+
+`x-display-status.experience`（也位於 `/health.display.experience`）為 `idle | active | complete`，附 `experienceEvidence` 說明。這是整段 G 體驗狀態，與 ready、phase、靜音及切頁 ACK 分開。
+
+- `complete`：目前 outro 旁白真正觸發原生 `HTMLMediaElement.ended`，run/page 相符、音軌佇列已結束，且自動展演不再排程。只切入 outro、暫停、播放錯誤、autoplay 阻擋或手動提前結束都仍為 active；重播會清除完成證據。
+- `idle`：停在 intro，且該次旁白已真正結束或已明確停止，自動展演不在執行。X intro/welcome 現為專用 reset 待機：取消未完成播放請求、停止旁白與自動流程，回 intro 且不自播，確認 experience=idle 並完成實際渲染才回 applied ACK。idle 狀態先於 ACK 送出。非 X 手動切 intro 保留自動旁白，此時仍 active，播完才 idle。
+- 其他情況為 `active`；動線 cleared 或科普單題播完是中間步驟，不直接當作整段 G 完成。音量為 0 也不等於完成。
+- 現有 2 秒狀態心跳回報最新語意，與每次命令後立即回報相容；不需要更改或重啟 relay。X 應直接透傳 display.experience，缺欄位不可猜成 idle。
