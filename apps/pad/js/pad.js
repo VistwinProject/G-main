@@ -60,7 +60,7 @@ const VIEW = {
   prevention: () => ({ view:'prevention', state:'safe' }),
   // 待機頁的文案全部寫在 index.html 裡（含天氣和三張狀態卡那些寫死的展示值），
   // 這邊只要切版面；會動的只有時鐘和電量。
-  intro: () => ({ view: 'idle', state: 'safe' }),
+  intro: () => ({ view: 'alarm', state: 'alarm' }),
   golden30: () => ({ view: 'alarm', state: 'alarm' }),
   // aiRoute 下面還分三種：還沒開始跑 / 跑動線中 / 已抵達出口。
   // ⚙ 還沒開始跑的時候**不要隨便報一個出口** —— 那時候主展示端還沒挑動線，
@@ -68,10 +68,11 @@ const VIEW = {
   //   所以沒有 exit 就顯示雲端宅邸 App 那一頁（主展示端此時也正停在首頁待機），
   //   平面圖和小人整個不畫。
   aiRoute: (s) => {
-    if (!s.exit) return { view: 'app', state: 'safe' };
+    const state=s.phase==='cleared'?'clear':s.phase==='running'?'alarm':'safe';
+    if (!s.exit) return { view: 'app', state };
     const done = s.phase === 'cleared';
     return {
-      view: 'notice', state: done ? 'clear' : 'guide', exit: s.exit, route: s.route, done,
+      view: 'notice', state, exit: s.exit, route: s.route, done,
       lead: done ? '已抵達' : '請前往',
       why: done
         ? `您已抵達 ${s.exit} 出口，已離開危險區域`
@@ -334,17 +335,20 @@ function selectPrevention(disaster,topic){
   sync.send({scene:'prevention',cmd:'prevention-select',cmdId:cmdTag+'-'+cmdSeq,preventionChoice:{disaster,topic},now:Date.now()});
 }
 function render(s) {
+  // Old relay snapshots must not reopen retired sections.
+  if (s?.scene === 'golden30' || s?.scene === 'prevention') s = {...s, scene:'aiRoute', phase:'idle', exit:null, route:-1, anim:null};
   lastPadState=s??{};
   document.querySelectorAll('[data-scene]').forEach(b=>{const active=b.dataset.scene===(s?.scene==='intro'?'welcome':s?.scene);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
-  renderPreventionPicker(s);
   const make = VIEW[s?.scene] ?? VIEW.intro;
   const v = make(s ?? {});
-  setAnim(s);
+  els.body.dataset.equipment=String(s?.scene==='aiRoute');
+  window.dispatchEvent(new CustomEvent('pad:route-state',{detail:s}));
+  setAnim(s?.scene==='aiRoute'?{...s,anim:null}:s);
   const was = els.body.dataset.view;                 // 換之前是哪一頁，滑動要靠它判斷方向
   els.body.dataset.state = v.state;
   els.body.dataset.view = v.view ?? 'plain';
   swipe(was, els.body.dataset.view);
-  if (v.view === 'notice') fillNotice(v);
+  if (v.view === 'notice'&&s?.scene!=='aiRoute') fillNotice(v);
   else if(v.view==='prevention'){
     const info=s?.prevention;
     $('p-disaster').textContent=info?.disaster||'建築防災科普';
@@ -433,7 +437,7 @@ const sync = createSync({
    ⚠️ 送出去的同時**本機先換**，不要等一趟來回 —— 區域網路也有幾十毫秒，
       手指離開螢幕畫面卻沒反應，感覺就像沒點到。 */
 const DRIVE = {
-  alarm: { scene: 'golden30', phase: 'idle', route: -1, exit: null, anim: null },
+  alarm: { scene: 'aiRoute', phase: 'idle', route: -1, exit: null, anim: null },
   app:   { scene: 'aiRoute',  phase: 'idle', route: -1, exit: null, anim: null },
 };
 
@@ -501,7 +505,7 @@ function command(cmd, btns = []) {
 }
 
 const routeBtns = () => [els.nPlay, els.nNext];
-els.actGuide?.addEventListener('click', () => command('route-next'));   // 隨機挑一條
+els.actGuide?.addEventListener('click', () => command('route-play'));   // 展示設備方向
 els.nPlay?.addEventListener('click', () => command('route-play', routeBtns()));
 els.nNext?.addEventListener('click', () => command('route-next', routeBtns()));
 

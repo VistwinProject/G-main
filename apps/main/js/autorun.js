@@ -1,7 +1,7 @@
 /* =========================================================================
    自動展演：按一次「▶ 自動展演」，01 → 05 整場跑完
    -------------------------------------------------------------------------
-   01 前言介紹 → 02 黃金30秒 → 03 逃生動線（隨機兩條）→ 04 先行預防（隨機兩個主題）
+   01 前言介紹 → 03 逃生動線（隨機兩條）
    → 05 結語，結束後停在結語頁。
 
    ⚠️ 這支**只從外面操作既有 UI**：window.__goto 換頁、點 #route-next、點科普的
@@ -21,31 +21,47 @@ const STEP = {
   welcomeMax: 30,       // 等 welcome 自己接到 intro 最久等多久（音檔要下載＋解碼，會比 17.6 秒晚）
   introHold: 2.2,       // 前言頁旁白之後的緩衝。⚠️ 要留夠：narration 在最後一句前會停 0.5 秒，
                         //    之後還用 0.93 倍速播，實際比音檔長度長一些
-  countdown: 32,        // 黃金30秒：倒數 30 秒 + 收尾
   routeIntroHold: 1.2,  // 動線頁進場旁白之後的緩衝
-  routeCount: 2,        // 隨機示範幾條動線
-  routeStart: 4,        // 按下切換之後，等介面離開綠色（新的一條開跑）最久等多久
-  routeTimeout: 25,     // 等通關（轉綠）最久等多久，逾時就放行
-  routeClearHold: 3.5,  // 通關畫面停多久
-  topicCount: 2,        // 隨機看幾個科普主題
-  topicSettle: 1.6,     // 點了災害之後等主題按鈕長出來
-  topicHold: 26,        // 每個主題停多久（最長的 fire-evacuation 是 24.98 秒）
-  preventionEnter: 3,   // 進科普頁等模型載入
+  routeTimeout: 60,    // 等原有動線動畫與通關畫面完成
+  routeClearHold: 3.5,
   outroHold: 2.2,       // 結語頁跟前言頁一樣有收尾停頓＋0.93 倍速，緩衝要留夠
 };
 
 const STOP = Symbol('stop');
 let current = 0;        // 每按一次 +1；awaits 醒來發現變了就中止
 let timer = null;
+let cancelSleep=null;
 let button = null;
+let timeline=null,progressTimer=null,stage=0,stageStarted=0,stageDuration=1,slider=null,dragging=false;
+const stageNames=['01 前言介紹','02 逃生動線','03 結語'];
+const durations=[NARRATION.welcome+NARRATION.intro+STEP.introHold,NARRATION.routeIntro+STEP.routeIntroHold+12,NARRATION.outro+STEP.outroHold];
+const total=durations.reduce((a,b)=>a+b,0);
+function updateProgress(){
+  if(!slider||dragging)return;
+  const clock=window.__showNarration?.clock();
+  let elapsed=(performance.now()-stageStarted)/1000;
+  if(clock?.page==='welcome'&&stage===0)elapsed=clock.time;
+  if(clock?.page==='intro'&&stage===0)elapsed=NARRATION.welcome+clock.time;
+  if(clock?.page==='outro'&&stage===2)elapsed=clock.time;
+  slider.value=durations.slice(0,stage).reduce((a,b)=>a+b,0)+Math.min(stageDuration,elapsed);
+  slider.style.setProperty('--progress',`${Number(slider.value)/total*100}%`);
+}
+function setStage(index,seconds){
+  stage=index;stageStarted=performance.now();stageDuration=seconds;
+  timeline?.querySelectorAll('button').forEach((b,i)=>{
+    b.classList.toggle('is-current',i===index);
+    if(i===index)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');
+    b.style.setProperty('--progress',i<index?'100%':'0%');
+  });
+}
 
-const rand = (n) => Math.floor(Math.random() * n);
-const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 function sleep(seconds, mine) {
+  if(mine!==current)return Promise.reject(STOP);
   return new Promise((resolve, reject) => {
     clearTimeout(timer);
-    timer = setTimeout(() => (mine === current ? resolve() : reject(STOP)), seconds * 1000);
+    cancelSleep=()=>reject(STOP);
+    timer = setTimeout(() => {cancelSleep=null;mine === current ? resolve() : reject(STOP);}, seconds * 1000);
   });
 }
 
@@ -61,12 +77,15 @@ async function until(test, maxSeconds, mine) {
 }
 
 const go = (page) => window.__goto?.(page);
-const isGreen = () => document.documentElement.dataset.theme === 'green';
 const page = () => document.querySelector('.page.is-active')?.dataset.page;
 
 function setRunning(on) {
   if (!button) return;
-  button.textContent = on ? '■ 停止展演' : '▶ 自動展演';
+  button.textContent = on ? '■' : '▶';
+  button.title=on?'停止自動展演':'自動展演';
+  button.setAttribute('aria-label',button.title);
+  clearInterval(progressTimer);
+  if(on)progressTimer=setInterval(updateProgress,100);
   button.classList.toggle('is-running', on);
   document.documentElement.classList.toggle('is-autorun', on);
 }
@@ -74,13 +93,19 @@ function setRunning(on) {
 function stop() {
   current += 1;            // 讓所有還在等的 await 醒來時中止
   clearTimeout(timer);
+  cancelSleep?.();cancelSleep=null;
   setRunning(false);
 }
 
-async function play() {
+async function play(start=0,offset=0) {
+  clearTimeout(timer);
+  cancelSleep?.();cancelSleep=null;
   const mine = ++current;
   setRunning(true);
   try {
+    if(start<=0){
+    setStage(0,NARRATION.welcome+NARRATION.intro+STEP.introHold);
+    stageStarted-=offset*1000;
     // 01 前言介紹＝**兩頁**：welcome（開場）旁白播完，narration.js 會自己 navigate('intro')。
     //    導覽上的 01 對這兩頁都會亮（main.js 的 goto 有特別處理），所以只播 welcome 等於沒演完。
     // ⚠️ 不要用計時等 welcome —— 音檔要先下載 + decodeAudioData 算字幕斷點，真正開始播的時間
@@ -88,50 +113,50 @@ async function play() {
     // ⚠️ 按下按鈕時常常本來就停在 welcome，那時 goto() 會因為 id === current 直接 return，
     //    旁白**不會從頭播**，開場就等於演一半。所以這種情況改叫 narration 的「重播」。
     const onWelcome = page() === 'welcome';
-    go('welcome');
-    if (onWelcome) document.querySelector('.voice-replay')?.click();
-    if (!(await until(() => page() === 'intro', STEP.welcomeMax, mine))) go('intro');  // 旁白沒播成功就自己接手
-    await sleep(NARRATION.intro + STEP.introHold, mine);
-
-    // 02 黃金30秒：倒數自己會跑，等它一輪
-    // ⚠️ 倒數跑完 main.js 本來就會自動跳首頁（onEnd → WELCOME_TO），比這裡早約 2 秒。
-    //    不衝突：goto() 有 `id === current` 就 return，下面那句等於 no-op，不會重跑一次進場。
-    go('first');
-    await sleep(STEP.countdown, mine);
-
-    // 03 逃生動線：進場旁白之後，隨機示範 routeCount 條
-    go('home');
-    await sleep(NARRATION.routeIntro + STEP.routeIntroHold, mine);
-    for (let i = 0; i < STEP.routeCount; i++) {
-      // 「切換逃生動線」本來就會隨機挑一條並避開目前這條，不用自己抽
-      document.getElementById('route-next')?.click();
-      // ⚠️ 上一條剛通關時主題還是綠的，直接等 isGreen 會立刻成立、整條被跳過。
-      //    所以先等它離開綠色（轉紅＝新的一條開跑），再等它轉回綠色。
-      await until(() => !isGreen(), STEP.routeStart, mine);
-      await until(isGreen, STEP.routeTimeout, mine);   // 跑到出口＝介面轉綠
-      await sleep(STEP.routeClearHold, mine);
+    if(offset<NARRATION.welcome){
+      go('welcome');if(onWelcome)document.querySelector('.voice-replay')?.click();
+      if(offset)await window.__showNarration?.seek(offset);
+      if(!(await until(()=>page()==='intro',STEP.welcomeMax,mine)))go('intro');
+      await sleep(NARRATION.intro+STEP.introHold,mine);
+    }else{
+      go('intro');await window.__showNarration?.seek(offset-NARRATION.welcome);
+      await sleep(Math.max(.01,durations[0]-offset),mine);
+    }
+    offset=0;
     }
 
-    // 04 先行預防：隨機挑 topicCount 個主題，盡量不重複同一個災害
-    go('prevention');
-    await sleep(STEP.preventionEnter, mine);
-    let lastDisaster = -1;
-    for (let i = 0; i < STEP.topicCount; i++) {
-      const disasters = $$('.information-nav > button');
-      if (!disasters.length) break;
-      let pick = rand(disasters.length);
-      if (disasters.length > 1 && pick === lastDisaster) pick = (pick + 1) % disasters.length;
-      lastDisaster = pick;
-      disasters[pick].click();
-      await sleep(STEP.topicSettle, mine);
-      const topics = $$('.information-topics button');
-      if (topics.length) topics[rand(topics.length)].click();
-      await sleep(STEP.topicHold, mine);
+    // 03 逃生動線：進場旁白之後展示設備方向
+    if(start<=1){
+    setStage(1,NARRATION.routeIntro+STEP.routeIntroHold+12);
+    stageStarted-=offset*1000;
+    const wasHome=page()==='home';
+    if(wasHome)go('intro');
+    go('home');
+    const routeStart=NARRATION.routeIntro+STEP.routeIntroHold;
+    if(offset<routeStart){
+      if(offset)await window.__showNarration?.seek(offset);
+      await sleep(routeStart-offset,mine);
+    }
+    if(mine!==current)throw STOP;
+    document.getElementById('route-play')?.click();
+    if(offset>=routeStart){
+      await until(()=>window.__showNarration?.clock().clip==='route-play.mp3',10,mine);
+      if(mine!==current)throw STOP;
+      await window.__showNarration?.seek(offset-routeStart);
+    }
+    await until(() => document.documentElement.dataset.theme === 'green', STEP.routeTimeout, mine);
+    await sleep(STEP.routeClearHold, mine);
+    offset=0;
     }
 
     // 05 結語
+    setStage(2,NARRATION.outro+STEP.outroHold);
+    stageStarted-=offset*1000;
+    const wasOutro=page()==='outro';
     go('outro');
-    await sleep(NARRATION.outro + STEP.outroHold, mine);
+    if(wasOutro)document.querySelector('.voice-replay')?.click();
+    if(offset)await window.__showNarration?.seek(offset);
+    await sleep(Math.max(.01,NARRATION.outro+STEP.outroHold-offset),mine);
   } catch (error) {
     if (error !== STOP) throw error;
     return;                                   // 被停掉：setRunning 已經在 stop() 做過
@@ -147,9 +172,42 @@ function mount(nav) {
   button = document.createElement('button');
   button.type = 'button';
   button.className = 'autorun-toggle';
-  button.textContent = '▶ 自動展演';
+  button.textContent = '▶';
+  button.title='自動展演';button.setAttribute('aria-label','自動展演');
   button.onclick = () => (document.documentElement.classList.contains('is-autorun') ? stop() : play());
   nav.prepend(button);
+  timeline=document.createElement('div');timeline.className='show-timeline';
+  const labels=document.createElement('div');labels.className='show-timeline-labels';
+  stageNames.forEach(name=>{const label=document.createElement('span');label.textContent=name;labels.append(label);});
+  slider=document.createElement('input');slider.type='range';slider.min=0;slider.max=total;slider.step=.1;slider.value=0;
+  slider.setAttribute('aria-label','拖曳控制展演進度');
+  slider.oninput=()=>{dragging=true;slider.style.setProperty('--progress',`${Number(slider.value)/total*100}%`);};
+  slider.onchange=()=>{
+    let time=Number(slider.value),index=0;
+    while(index<durations.length-1&&time>=durations[index])time-=durations[index++];
+    dragging=false;void play(index,time);
+  };
+  timeline.append(labels,slider);
+  button.after(timeline);
+  const style=document.createElement('style');style.textContent=`
+  .page-nav .skin-toggle__label{display:none!important}
+  .page-nav .autorun-toggle{min-width:3rem;padding-inline:1rem}
+  .show-timeline{display:none;flex-direction:column;justify-content:center;gap:.6rem;width:32rem;max-width:55vw;padding:.5rem}
+  .show-timeline-labels{display:flex;justify-content:space-between;width:100%;font-size:.8rem;color:var(--ink)}
+  .show-timeline input{appearance:none;width:100%;height:6px;margin:.5rem 0;background:linear-gradient(to right,var(--brand-hi) var(--progress,0%),var(--brand-line) var(--progress,0%));border-radius:4px;cursor:pointer;touch-action:pan-y}
+  .show-timeline input::-webkit-slider-thumb{appearance:none;width:18px;height:18px;border-radius:50%;background:var(--brand-hi);border:2px solid var(--bg-0)}
+  .show-timeline input::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--brand-hi);border:2px solid var(--bg-0)}
+  .is-autorun .page-nav>[data-go-page]{display:none!important}
+  .is-autorun .show-timeline{display:flex}
+  .page-nav .show-timeline button{flex:1;position:relative;border:0;border-radius:0;padding:.7rem .4rem 1rem;font-size:.8rem;white-space:nowrap;background:transparent;color:var(--ink)}
+  .show-timeline button::before,.show-timeline button::after{content:'';position:absolute;left:0;bottom:.35rem;height:3px;border-radius:2px}
+  .show-timeline button::before{width:100%;background:var(--brand-line)}
+  .show-timeline button::after{width:var(--progress,0%);background:var(--brand-hi)}
+  .show-timeline button.is-current{font-weight:700;color:var(--brand-hi)}
+  .show-timeline button:focus-visible{outline:2px solid var(--brand-hi)}
+  `;document.head.append(style);
+  const skin=nav.querySelector('#skin-toggle');
+  if(skin){const label=()=>skin.title=skin.getAttribute('aria-label')||'切換深淺色';label();new MutationObserver(label).observe(skin,{attributes:true,attributeFilter:['aria-label']});}
 }
 
 const nav = document.querySelector('.page-nav');

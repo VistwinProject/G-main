@@ -137,14 +137,8 @@ export const disasters = [
 ];
 
 export function createPreventionPage(){
-  const page=document.createElement('section');page.className='page page--home page--prevention';page.dataset.page='prevention';
-  const home=document.querySelector('[data-page="home"]');
-  const brand=home.querySelector('.home__brand').cloneNode(true);
-  brand.removeAttribute('data-obj');brand.removeAttribute('data-label');
-  page.innerHTML='<div class="grain"></div><div class="prevention-heading"></div><p class="prevention-subtitle">先行預防</p><div class="stage prevention-stage" id="stage-prevention"></div>';
-  page.querySelector('.prevention-heading').append(brand);document.getElementById('app').append(page);
   const nav=document.createElement('nav');nav.className='page-nav';nav.setAttribute('aria-label','展示頁面切換');
-  [['welcome','01','前言介紹'],['first','02','黃金30秒'],['home','03','逃生動線'],['prevention','04','先行預防'],['outro','05','結語']].forEach(([key,number,label])=>{
+  [['welcome','01','前言介紹'],['home','02','逃生動線'],['outro','03','結語']].forEach(([key,number,label])=>{
     const button=document.createElement('button');button.type='button';button.dataset.goPage=key;button.innerHTML=`<span>${number}</span>${label}`;nav.append(button);
   });
   const skin=document.getElementById('skin-toggle');nav.append(skin);

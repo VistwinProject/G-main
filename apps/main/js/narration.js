@@ -141,7 +141,7 @@ export function createNarration({navigate}){
     cuePreparation=Promise.resolve();sentenceWeights=null;clipSequence=[...files];clipQueue=files.slice(1);
     cues=[0];dockCaption.textContent='';controls.hidden=false;
     wave.setAttribute('aria-disabled','false');wave.setAttribute('aria-label','播放或暫停本頁旁白');
-    loadClip(files[0]);play();
+    loadClip(files[0]);return play();
   }
   window.addEventListener('narration:phase',event=>{
     const phase=event.detail;
@@ -289,7 +289,22 @@ export function createNarration({navigate}){
   window.addEventListener('pagehide',event=>{if(!event.persisted){++orbRequest;window.removeEventListener('keydown',onOrbKey);clearInterval(voiceTimer);cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb?.dispose();audio.pause();context?.close();}});
   return {stop,getStatus(){return {page:current,run:request,paused:audio.paused,stopped:explicitlyStopped&&audio.paused&&!closingHold,
     finished:!!completion&&completion.run===request&&completion.page===current&&audio.ended&&clipQueue.length===0,
-    completion};},enter(id,{autoplay=true}={}){++request;completion=null;explicitlyStopped=!autoplay;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];activeTopic=null;activeClip=null;lastCaptionKey=null;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
+    completion};},
+    clock(){return {page:current,clip:activeClip,time:audio.currentTime,duration:audio.duration};},
+    async seek(seconds){
+      const ticket=request;
+      await play();
+      if(ticket!==request||!Number.isFinite(audio.duration))return;
+      resetClosing();audio.currentTime=Math.max(0,Math.min(seconds,audio.duration-.01));
+      closingStarted=audio.currentTime>=(cues[2]??Infinity);sync();
+    },
+    playRoute(){return playClips(['route-play.mp3']);},
+    routeRemaining(){
+      if(current!=='home'||activeClip!=='route-play.mp3')return NaN;
+      const duration=Number.isFinite(audio.duration)?audio.duration:clipDuration;
+      return (duration-audio.currentTime)/audio.playbackRate;
+    },
+    enter(id,{autoplay=true}={}){++request;completion=null;explicitlyStopped=!autoplay;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];activeTopic=null;activeClip=null;lastCaptionKey=null;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
     if(!autoplay){showActive=false;orb?.end();finish.hidden=true;}
     const file=files[id]||pageNarration[id]?.file;
     dock.hidden=id==='welcome';dock.dataset.page=id;dockCaption.textContent='';

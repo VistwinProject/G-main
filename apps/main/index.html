@@ -6,7 +6,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex, nosnippet">
-<title>火災黃金30秒 — THE GOLDEN 30 SECONDS</title>
+<title>寶舖全健築知行 — 主螢幕</title>
+<link rel="stylesheet" href="./css/equipment.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Oswald:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -231,6 +232,7 @@
 
     <div class="home">
       <header class="home__brand" data-obj="homeBrand" data-label="標題">
+        <div class="equipment-logo" role="img" aria-label="寶舖全健築知行"></div>
         <span class="home__mark">
           <svg viewBox="0 0 32 24"><path d="M8.4 20.5h13.9a5.1 5.1 0 0 0 .6-10.2A7 7 0 0 0 9.3 8.1a5.4 5.4 0 0 0-.9 12.4Z"/><path d="M12.6 17.2v-2.6M15.8 17.2v-4.6M19 17.2v-3.4"/></svg>
         </span>
@@ -256,25 +258,25 @@
           <span class="home__status-ico">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
           </span>
-          <b>火源位置</b><i id="status-fire" class="is-alert">已辨識</i>
+          <b>安全梯</b><i>5F・6F・7F</i>
         </li>
         <li class="home__status-item">
           <span class="home__status-ico">
             <svg viewBox="0 0 24 24"><path d="M8 16.4h8.4a3.5 3.5 0 0 0 .4-7A5.3 5.3 0 0 0 6.3 9.8 3.3 3.3 0 0 0 8 16.4Z"/><path d="M9 19.8c1-.7 2-.7 3 0s2 .7 3 0"/></svg>
           </span>
-          <b>煙霧擴散</b><i class="is-ok">低風險</i>
+          <b>緩降機</b><i>5F 右側</i>
         </li>
         <li class="home__status-item">
           <span class="home__status-ico">
             <svg viewBox="0 0 24 24"><path d="M13.5 4H6v16h7.5"/><path d="M10.5 12h8.2"/><path d="m15.8 9 3 3-3 3"/></svg>
           </span>
-          <b>A出口</b><i id="status-exit-a" class="is-alert">壅塞</i>
+          <b>緩降機</b><i>6F 陽台側</i>
         </li>
         <li class="home__status-item">
           <span class="home__status-ico">
             <svg viewBox="0 0 24 24"><path d="M10.5 4H18v16h-7.5"/><path d="M13.5 12H5.3"/><path d="m8.2 9-3 3 3 3"/></svg>
           </span>
-          <b>B出口</b><i id="status-exit-b" class="is-ok">暢通</i>
+          <b>緩降機</b><i>7F 左側</i>
         </li>
       </ul>
 
@@ -286,7 +288,7 @@
           <span class="home__route-ico">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10.2 8.4 16 12l-5.8 3.6Z"/></svg>
           </span>
-          <span class="home__route-label"><b>展示逃生動線</b><i>ROUTE DEMO</i></span>
+          <span class="home__route-label"><b>展示逃生設備方向</b><i>EQUIPMENT DIRECTION</i></span>
           <span class="home__route-noise" aria-hidden="true"></span>
         </button>
         <button class="home__route-btn chamfer" type="button" id="route-next"
@@ -301,7 +303,7 @@
 
       <!-- 抵達綠色出口後跳出來的通關訊息（蓋在整頁上，不吃滑鼠） -->
       <div class="home__clear" id="route-clear" aria-live="polite">
-        <p class="home__clear-box chamfer"><b>恭喜通關</b><i>SAFELY EVACUATED</i></p>
+        <p class="home__clear-box chamfer"><b>通關成功</b><i>SAFELY EVACUATED</i></p>
       </div>
 
       <footer class="home__foot">
