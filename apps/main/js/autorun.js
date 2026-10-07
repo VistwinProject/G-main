@@ -1,3 +1,4 @@
+import {planMinuteShow} from './show-timing.js';
 /* =========================================================================
    自動展演：按一次「▶ 自動展演」，01 → 05 整場跑完
    -------------------------------------------------------------------------
@@ -34,15 +35,15 @@ let cancelSleep=null;
 let button = null;
 let timeline=null,progressTimer=null,stage=0,stageStarted=0,stageDuration=1,slider=null,dragging=false;
 const stageNames=['01 前言介紹','02 逃生動線','03 結語'];
-const durations=[NARRATION.welcome+NARRATION.intro+STEP.introHold,NARRATION.routeIntro+STEP.routeIntroHold+12,NARRATION.outro+STEP.outroHold];
-const total=durations.reduce((a,b)=>a+b,0);
+let durations=[30,20,10],rate=1;
+const total=60;
 function updateProgress(){
   if(!slider||dragging)return;
   const clock=window.__showNarration?.clock();
   let elapsed=(performance.now()-stageStarted)/1000;
-  if(clock?.page==='welcome'&&stage===0)elapsed=clock.time;
-  if(clock?.page==='intro'&&stage===0)elapsed=NARRATION.welcome+clock.time;
-  if(clock?.page==='outro'&&stage===2)elapsed=clock.time;
+  if(clock?.page==='welcome'&&stage===0)elapsed=clock.time/rate;
+  if(clock?.page==='intro'&&stage===0)elapsed=NARRATION.welcome+clock.time/rate;
+  if(clock?.page==='outro'&&stage===2)elapsed=clock.time/rate;
   slider.value=durations.slice(0,stage).reduce((a,b)=>a+b,0)+Math.min(stageDuration,elapsed);
   slider.style.setProperty('--progress',`${Number(slider.value)/total*100}%`);
 }
@@ -88,6 +89,7 @@ function setRunning(on) {
   if(on)progressTimer=setInterval(updateProgress,100);
   button.classList.toggle('is-running', on);
   document.documentElement.classList.toggle('is-autorun', on);
+  if(!on)window.__showNarration?.setShowRate(1);
 }
 
 function stop() {
@@ -95,14 +97,24 @@ function stop() {
   clearTimeout(timer);
   cancelSleep?.();cancelSleep=null;
   setRunning(false);
+  window.dispatchEvent(new Event('show:ended'));
 }
 
 async function play(start=0,offset=0) {
+  window.dispatchEvent(new Event('lighting:cancel'));
   clearTimeout(timer);
   cancelSleep?.();cancelSleep=null;
   const mine = ++current;
-  setRunning(true);
   try {
+    button.disabled=true;button.title='準備一分鐘展演音檔';
+    const lengths=await window.__showNarration.prepareShow();
+    if(mine!==current)throw STOP;
+    // Keep all narration; use one pitch-preserving speed across the five clips.
+    const plan=planMinuteShow(lengths,STEP);rate=plan.rate;durations=plan.durations;
+    [NARRATION.welcome,NARRATION.intro,NARRATION.routeIntro,NARRATION.routePlay,NARRATION.outro]=plan.speech;
+    const deadline=performance.now()+(total-durations.slice(0,start).reduce((a,b)=>a+b,0)-offset)*1000;
+    setRunning(true);window.__showNarration.setShowRate(rate);button.disabled=false;
+    console.info('[autorun] 60-second show', {rate,durations});
     if(start<=0){
     setStage(0,NARRATION.welcome+NARRATION.intro+STEP.introHold);
     stageStarted-=offset*1000;
@@ -115,11 +127,11 @@ async function play(start=0,offset=0) {
     const onWelcome = page() === 'welcome';
     if(offset<NARRATION.welcome){
       go('welcome');if(onWelcome)document.querySelector('.voice-replay')?.click();
-      if(offset)await window.__showNarration?.seek(offset);
-      if(!(await until(()=>page()==='intro',STEP.welcomeMax,mine)))go('intro');
+      if(offset)await window.__showNarration?.seek(offset*rate);
+      if(!(await until(()=>page()==='intro',NARRATION.welcome+5,mine)))throw Error('前言語音未完成，請確認可播放音訊');
       await sleep(NARRATION.intro+STEP.introHold,mine);
     }else{
-      go('intro');await window.__showNarration?.seek(offset-NARRATION.welcome);
+      go('intro');await window.__showNarration?.seek((offset-NARRATION.welcome)*rate);
       await sleep(Math.max(.01,durations[0]-offset),mine);
     }
     offset=0;
@@ -127,14 +139,14 @@ async function play(start=0,offset=0) {
 
     // 03 逃生動線：進場旁白之後展示設備方向
     if(start<=1){
-    setStage(1,NARRATION.routeIntro+STEP.routeIntroHold+12);
+    setStage(1,durations[1]);
     stageStarted-=offset*1000;
     const wasHome=page()==='home';
     if(wasHome)go('intro');
     go('home');
     const routeStart=NARRATION.routeIntro+STEP.routeIntroHold;
     if(offset<routeStart){
-      if(offset)await window.__showNarration?.seek(offset);
+      if(offset)await window.__showNarration?.seek(offset*rate);
       await sleep(routeStart-offset,mine);
     }
     if(mine!==current)throw STOP;
@@ -142,7 +154,7 @@ async function play(start=0,offset=0) {
     if(offset>=routeStart){
       await until(()=>window.__showNarration?.clock().clip==='route-play.mp3',10,mine);
       if(mine!==current)throw STOP;
-      await window.__showNarration?.seek(offset-routeStart);
+      await window.__showNarration?.seek((offset-routeStart-.22)*rate);
     }
     await until(() => document.documentElement.dataset.theme === 'green', STEP.routeTimeout, mine);
     await sleep(STEP.routeClearHold, mine);
@@ -150,18 +162,22 @@ async function play(start=0,offset=0) {
     }
 
     // 05 結語
-    setStage(2,NARRATION.outro+STEP.outroHold);
+    setStage(2,durations[2]);
     stageStarted-=offset*1000;
     const wasOutro=page()==='outro';
     go('outro');
     if(wasOutro)document.querySelector('.voice-replay')?.click();
-    if(offset)await window.__showNarration?.seek(offset);
-    await sleep(Math.max(.01,NARRATION.outro+STEP.outroHold-offset),mine);
+    if(offset)await window.__showNarration?.seek(offset*rate);
+    const remaining=Math.max(.01,(deadline-performance.now())/1000);
+    await sleep(Math.max(0,remaining-.5),mine);
+    window.dispatchEvent(new CustomEvent('lighting:preview',{detail:{effect:'blue'}}));
+    await sleep(Math.min(.5,remaining),mine);
   } catch (error) {
-    if (error !== STOP) throw error;
+    if(mine===current){button.disabled=false;setRunning(false);}
+    if (error !== STOP) {console.error(error);button.title=`展演準備失敗：${error.message}`;}
     return;                                   // 被停掉：setRunning 已經在 stop() 做過
   }
-  if (mine === current) setRunning(false);    // 正常跑完
+  if (mine === current) {setRunning(false);window.dispatchEvent(new Event('show:ended'));}
 }
 
 /* ---------- 掛上按鈕 ----------

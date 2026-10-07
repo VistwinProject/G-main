@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { networkInterfaces, hostname } from 'node:os';
 import { createXControl } from './x-control.mjs';
+import {createLighting} from './lighting.mjs';
+const lighting=createLighting();
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PORT = Number(process.argv[2] ?? process.env.PORT ?? 5280);
@@ -209,6 +211,10 @@ server.on('upgrade', (req, socket) => {
       if (!msg || typeof msg !== 'object') continue;
       if (xControl.handle(c, msg)) continue;
       if (msg.type === 'hello') { wsSend(c, state); continue; }
+      if(msg.type==='lighting'){
+        if(c.role==='display')lighting.set(msg.effect);
+        continue;
+      }
       if(msg.type==='voice'){
         if(c.role==='display')broadcast({type:'voice',active:!!msg.active,level:Math.max(0,Math.min(1,Number(msg.level)||0))},c);
         continue;

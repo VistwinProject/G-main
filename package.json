@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server/server.mjs",
-    "test": "node server/verify.mjs && node --test server/x-control.test.mjs tools/control-render.test.mjs tools/experience.test.mjs tools/narration-reset.test.mjs"
+    "test": "node server/verify.mjs && node --test server/x-control.test.mjs tools/control-render.test.mjs tools/experience.test.mjs tools/narration-reset.test.mjs tools/lighting.test.mjs tools/show-timing.test.mjs"
   },
   "engines": {
     "node": ">=22"
