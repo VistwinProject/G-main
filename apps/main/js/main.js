@@ -1,6 +1,7 @@
 import { Viewer } from './viewer.js';
+import { createEquipment } from './equipment.js';
 import { createNarrationPages, createNarration } from './narration.js';
-import { createInformation, createPreventionPage } from './information.js';
+import { createPreventionPage } from './information.js';
 import { createCountdown } from './countdown.js';
 import { createEditor } from './editor.js';
 import { createSync } from './sync.js';
@@ -13,7 +14,9 @@ import { createGuideStore } from './guides.js';
    ========================================================= */
 createPreventionPage();
 createNarrationPages();
-const PAGES = ['welcome', 'intro', 'first', 'home', 'prevention', 'outro'];
+const PAGES = ['welcome', 'intro', 'home', 'outro'];
+// Retain dormant countdown DOM for legacy layout helpers, never expose the removed page.
+document.querySelector('[data-page="first"]').style.display = 'none';
 
 /* 首頁逃生動線示範的節奏常數（editors 也用得到，所以放最上面） */
 /* 動線的節奏：**動線上的點照路徑長度等速跑**（秒數 = 長度 ÷ ROUTE_SPEED）。
@@ -24,7 +27,7 @@ const CAM_HOLD = 0.25;                      // 鏡頭在每個關鍵影格停幾
 const ROUTE_SECONDS = [3, 12];              // 每條的秒數上下限
 const ROUTE_RUN = 5;                        // 量不到長度時的後備秒數
 const SHOT_FLY = 0;                         // 狀態切換不用鏡頭飛過去銜接（改用黑幕），0 = 直接就定位
-const EXIT_HOLD = 500;                      // 小人跑到出口之後停幾毫秒才切通關（讓人看清楚他到了）
+const EXIT_HOLD = 1000;                     // 旁白實際結束後停留一秒再切通關
 /* 通關（綠）預設的運鏡：自己慢慢轉。編輯模式把「通關（綠）」存過之後就以存的為準 */
 const GREEN_MOTION = { autoRotate: true, speed: 0.3, swing: false };
 
@@ -35,7 +38,7 @@ const WELCOME_TO = 'home';
 let welcomeDone = false;
 
 const INTRO_FROM = 'intro';
-const INTRO_TO = 'first';
+const INTRO_TO = 'home';
 const INTRO_HOLD = 0;        // 前言頁停幾毫秒後自動進黃金30秒；**0 = 關掉自動跳頁**（要自己按 Esc）
 let introDone = false;
 let introTimer = null;
@@ -58,14 +61,13 @@ const SCENE = { welcome:'welcome', intro: 'intro', first: 'golden30', home: 'aiR
    ⚠️ 不會打回圈：goto() 開頭就 `id === current` 直接 return，
       所以「收到 → goto → pushSync → 對方收到 → goto」在第二步就停了。
       轉播站也不會把訊息轉回給發送者本人。 */
-const SCENE_PAGE = { welcome:'welcome', intro: 'intro', golden30: 'first', aiRoute: 'home', prevention:'prevention', outro: 'outro' };
+const SCENE_PAGE = { welcome:'welcome', intro: 'intro', golden30: 'home', aiRoute: 'home', prevention:'home', outro: 'outro' };
 
 /* Pad 上的按鈕送過來的指令。對到的就是這一頁畫面上那兩顆「展示／切換逃生動線」
    —— 同一個 playRouteDemo()，不要另外寫一套，不然兩邊的行為會慢慢長歪。
      route-play：重複目前這一條（Pad 出口頁的 ▶）
      route-next：隨機換一條（Pad 出口頁的 ⇄，以及 App 頁的「逃生指引」） */
 const PAD_CMD = {
-  'prevention-select': (s) => information.select(s.preventionChoice),
   'route-play': () => playRouteDemo(true),
   'route-next': () => playRouteDemo(false),
 };
@@ -162,7 +164,8 @@ const outroStage = document.getElementById('stage-outro');
 const introSpark = document.querySelector('.intro__spark');
 const homeStage = document.getElementById('stage-home');
 const viewer = new Viewer();
-const information = createInformation(viewer);
+const equipment = createEquipment(viewer);
+const information = { catalog: [] }; // Removed education page: no listeners or effects initialized.
 const countdown = createCountdown({
   ticksEl: document.getElementById('ring-ticks'),
   headEl: document.getElementById('ring-head'),
@@ -340,7 +343,7 @@ const editors = {
     // 編輯器切到哪個狀態，畫面就跟著變成那個狀態的配色與外觀（不然會在藍色底下調綠色的構圖）
     onState: (k) => {
       const route = /^route\d+$/.test(k);
-      viewer.setAllWhite(k === 'clear');
+      viewer.setAllWhite(false);
       setFireTag(k === 'clear');            // 編輯模式切到通關，狀態面板也要跟著變
       // 編動線＝紅色介面（照那條動線標 A／B），通關＝兩個都暢通，其餘回預設
       setExitTags(route ? Number(k.slice(5)) - 1 : -1, k === 'clear');
@@ -360,8 +363,10 @@ const closeEditors = (except) => {
 const params = new URLSearchParams(location.search);
 let current = null;
 const narration = createNarration({navigate: goto});
+window.__showNarration=narration;
 
 function goto(id, {remote=false} = {}) {
+  if (id === 'first' || id === 'prevention') id = 'home';
   if (!pageEls.has(id) || id === current) return;
   current = id;
   narration.enter(id);
@@ -435,7 +440,7 @@ addEventListener('keydown', (e) => {
   switch (e.code) {
     // 手動切過頁就取消自動進首頁，避免之後按 Esc 回來又被跳走
     case 'Enter': case 'NumpadEnter': welcomeDone = true; introDone = true; goto('home'); break;
-    case 'Escape':                    welcomeDone = true; introDone = true; goto('first'); break;
+    case 'Escape':                    welcomeDone = true; introDone = true; goto('home'); break;
     // A = 回前言頁（回去之後不會再自動跳走，要自己按 Esc）
     case 'KeyA':                      welcomeDone = true; introDone = true; goto('welcome'); break;
     // O = 結語頁（接在「恭喜通關」之後，不會自己跳過去，要按 O）
@@ -644,14 +649,21 @@ function showTaglineWord(i) {
   paintTagline(i);
 }
 
+let idleButtonTimer = null;
 function startIdleFx() {
   if (current !== 'home') return;
   pageEls.get('home')?.classList.add('is-idle');
+  clearInterval(idleButtonTimer);
+  idleButtonTimer = setInterval(() => {
+    if(current==='home'&&routeState==='idle'&&!document.hidden)glitchBtn(routePlayBtn);
+  },2800);
   taglineAt = -1;              // 下一顆起火點出現時就從第一個詞開始
   skipGlitch = true;           // 但按鈕的抽動要等到第二顆才開始（標語照樣亮）
 }
 
 function stopIdleFx() {
+  clearInterval(idleButtonTimer);
+  idleButtonTimer = null;
   pageEls.get('home')?.classList.remove('is-idle');
   clearTimeout(glitchWait);                        // 還在等頁面淡入就切走了，那一次不要補抽
   routePlayBtn?.classList.remove('is-glitch');     // 抽到一半切走就直接收掉
@@ -660,7 +672,20 @@ function stopIdleFx() {
 }
 
 /** repeat=true（展示）：重複「目前這一條」；repeat=false（切換）：隨機挑別條、避開目前這一條 */
-function playRouteDemo(repeat) {
+let routePlaybackRequest = 0;
+let finishAfterRouteVoice = null;
+window.addEventListener('narration:ended', ({detail}) => {
+  if(detail?.page!=='home'||detail?.clip!=='route-play.mp3'||current!=='home')return;
+  const finish=finishAfterRouteVoice;
+  finishAfterRouteVoice=null;
+  finish?.();
+});
+async function playRouteDemo(repeat) {
+  finishAfterRouteVoice=null;
+  clearTimeout(exitTimer);
+  const playbackRequest = ++routePlaybackRequest;
+  // 所有展示入口都依目前起火點播放；不再隨機切換逃生位置。
+  repeat = true;
   // 模型還沒載完就還沒有動線資料，直接不理會（別讓介面先變紅又變回來）
   if (!viewer.routeCount('tower')) {
     console.warn('[route] 首頁的逃生動線還沒載入完，稍等一下再按');
@@ -669,9 +694,11 @@ function playRouteDemo(repeat) {
   // 「目前這一條」：待機時＝正在冒煙的那一條（看到哪裡起火就從哪裡逃）；
   // 跑完／通關之後＝上一次跑的那一條。兩顆按鈕都以它為基準，一個重複、一個避開。
   const cur = routeState === 'idle' ? viewer.idleFireRoute('tower') : lastRoute;
-  window.dispatchEvent(new CustomEvent('narration:route', {detail:repeat?'repeat':'change'}));
+  await narration.playRoute();
+  if(playbackRequest!==routePlaybackRequest||current!=='home')return;
   clearTimeout(exitTimer);                  // 上一輪還停在出口的話，別讓它等一下又跳通關
   blackout(() => {
+    if(playbackRequest!==routePlaybackRequest||current!=='home')return;
     showClear(false);
     viewer.hideIdleFire('tower');           // 開始跑就把待機的起火點收掉
     stopIdleFx();                             // 待機的動態效果只在藍色介面跑，紅／綠停掉
@@ -680,9 +707,17 @@ function playRouteDemo(repeat) {
     setFireTag(false);                        // 回到紅色的「已辨識」
     setTheme('red');                          // 跑動線的這幾秒：整個介面轉紅
     routeState = 'running';
+    viewer.routeTopView = true;
     let runDur = 0;                           // 這一條實際跑幾秒，下面要一起送給 Pad
     lastRoute = viewer.playRoute('tower', {
-      duration: (i, len) => (runDur = routeSeconds(len)),  // 點等速：秒數只看路徑長度
+      arrowsOnly: true,
+      duration: (i, len) => {
+        // 在音訊真正開始後取剩餘時間，連黑幕轉場所花的時間也扣除。
+        const remaining = narration.routeRemaining();
+        return (runDur = Number.isFinite(remaining)
+          ? Math.max(.1, remaining - 1)
+          : routeSeconds(len));
+      },
       index: (repeat && cur >= 0) ? cur : null, // 展示＝重複目前這一條；切換＝交給下面隨機挑
       avoidCurrent: !repeat,                    // 切換時避開上一次播的那一條
       avoid: repeat ? -1 : cur,                 // 切換時也避開「目前這一條」（待機正在冒煙的那條）
@@ -690,15 +725,21 @@ function playRouteDemo(repeat) {
       shotBlend: SHOT_FLY,
       camHold: CAM_HOLD,                      // 鏡頭在每個關鍵影格停一下再轉
       onDone: () => {
-        routeState = 'cleared';
         anim = null;                          // 跑完了：Pad 把小人停在出口就好，不用再算
+      },
+    });
+    finishAfterRouteVoice = () => {
         // 抵達出口先停 EXIT_HOLD 毫秒 —— 這段期間動線畫著、小人站在綠色出口上不動，
         // 讓人看清楚他到了，再黑掉切通關。中途按按鈕或離開首頁要把這個計時器取消掉。
         clearTimeout(exitTimer);
         exitTimer = setTimeout(() => {
+          if(playbackRequest!==routePlaybackRequest||current!=='home')return;
           blackout(() => {                    // 動線 → 通關：黑掉再換，不要用鏡頭轉過去銜接
+            if(playbackRequest!==routePlaybackRequest||current!=='home')return;
+            routeState = 'cleared';
             viewer.stopRoute('tower');        // 抵達出口 → 路線消失
-            viewer.setAllWhite(true);         // 整棟建物變白
+            viewer.routeTopView = false;
+            viewer.setAllWhite(false);        // 通關保留線稿，由綠色主題上色
             // 通關（綠）：照這個狀態存的鏡頭／運鏡走；沒設過就用 GREEN_MOTION（原地慢慢轉）
             viewer.enterState('clear', SHOT_FLY, { defaultMotion: GREEN_MOTION });
             setTheme('green');                // 介面轉綠
@@ -709,8 +750,7 @@ function playRouteDemo(repeat) {
             startGreenFx();                   // 換「切換逃生動線」抽，同樣的節奏、綠色
           });
         }, EXIT_HOLD);
-      },
-    });
+    };
     setExitTags(lastRoute);                   // playRoute 是同步回傳索引的，挑完就能更新面板
     // Pad 的小人要跟這邊的小人跑在一起：把起跑時間和秒數一起送過去
     anim = { kind: 'route', t0: Date.now(), dur: runDur };
@@ -720,6 +760,9 @@ function playRouteDemo(repeat) {
 
 /** 回到還沒開始的狀態（離開首頁時） */
 function resetRouteDemo() {
+  finishAfterRouteVoice=null;
+  viewer.routeTopView = false;
+  ++routePlaybackRequest;
   if (routeState === 'idle') return;
   routeState = 'idle';
   anim = null;                              // 離開首頁：動線的動畫就結束了
@@ -865,7 +908,7 @@ skinBtn?.addEventListener('click', toggleSkin);
    套用完就把它從網址上拿掉，所以重新整理、或把網址傳給別人打開，都會回到前言頁，
    不會有人卡在某一頁當歡迎頁。 */
 const startPage = params.get('page');
-goto(PAGES.includes(startPage) ? startPage : 'welcome');
+goto(['first','prevention'].includes(startPage) ? 'home' : PAGES.includes(startPage) ? startPage : 'welcome');
 if (params.has('page')) {
   params.delete('page');                       // 只拿掉 page，其他參數（theme / edit / layout…）留著
   const q = params.toString();

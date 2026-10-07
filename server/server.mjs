@@ -5,7 +5,7 @@ import { readFile, writeFile, rm, realpath, lstat } from 'node:fs/promises';
 import { extname, join, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { networkInterfaces } from 'node:os';
+import { networkInterfaces, hostname } from 'node:os';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PORT = Number(process.argv[2] ?? process.env.PORT ?? 5280);
@@ -90,7 +90,19 @@ const server = createServer(async (req, res) => {
     const canonicalFile = await realpath(file);
     if (!inside(canonicalRoot, canonicalFile)) { res.writeHead(403).end('Forbidden'); return; }
     const body = await readFile(canonicalFile);
+    // Audio seeking requires byte-range responses in browsers such as Safari.
+    if(req.method==='GET'&&req.headers.range){
+      const range=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+      if(range&&(range[1]||range[2])){
+        const start=range[1]?Number(range[1]):Math.max(0,body.length-Number(range[2]));
+        const end=range[1]&&range[2]?Math.min(Number(range[2]),body.length-1):body.length-1;
+        if(start>end||start>=body.length){res.writeHead(416,{'Content-Range':`bytes */${body.length}`}).end();return;}
+        res.writeHead(206,{'Content-Type':TYPES[extname(file).toLowerCase()]??'application/octet-stream','Accept-Ranges':'bytes','Content-Range':`bytes ${start}-${end}/${body.length}`,'Content-Length':end-start+1,'Cache-Control':'no-cache'}).end(body.subarray(start,end+1));return;
+      }
+    }
     res.writeHead(200, {
+      'Accept-Ranges':'bytes',
+      'Content-Length':body.length,
       'Content-Type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
       'Cache-Control': 'no-cache',
       'X-Robots-Tag': 'noindex, nofollow',
@@ -242,5 +254,11 @@ server.listen(PORT, '0.0.0.0', () => {
   for (const url of lanURLs()) {
     console.log('LAN Main: ' + url + '/main/');
     console.log('LAN Pad:  ' + url + '/pad/');
+  }
+  // 主機名網址：IP 會跟著 DHCP／熱點變，主機名不會。iPad／iPhone 內建 Bonjour，
+  // Windows 10 之後也會回應 mDNS，所以 <主機名>.local 通常可以直接用，當固定網址比 IP 可靠。
+  {
+    console.log('mDNS Main: http://' + hostname() + '.local:' + PORT + '/main/');
+    console.log('mDNS Pad:  http://' + hostname() + '.local:' + PORT + '/pad/');
   }
 });

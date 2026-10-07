@@ -1,0 +1,38 @@
+.home__brand .home__mark,.home__brand .home__name,.home__head,.home__guide,#route-next{display:none!important}
+html[data-theme="green"] .equipment-box{border-color:#19bb70;box-shadow:0 0 8px #19bb7060}
+html[data-theme="green"] .equipment-marker small{color:#17965c}
+.equipment-logo{width:33rem;max-width:100%;aspect-ratio:3891/738;display:block;background:var(--brand-hi);-webkit-mask:url('../assets/baopu-logo.png') center/contain no-repeat;mask:url('../assets/baopu-logo.png') center/contain no-repeat}
+.equipment-labels{position:absolute;inset:0;pointer-events:none;z-index:12;overflow:hidden}
+.equipment-labels[hidden]{display:none}
+.equipment-symbol{display:inline-flex;width:2rem;height:2rem;align-items:center;justify-content:center;border:2px solid currentColor;background:var(--bg-0,#071c30);border-radius:.2rem;box-sizing:border-box}
+.equipment-symbol svg{width:85%;height:85%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.stair-symbol{color:#17965c}
+.descent-symbol{color:#17965c}
+.equipment-marker .descent-symbol{border-color:#17965c;box-shadow:none}
+.is-route-plan #stage-home{top:20%!important;left:50%!important;width:62%!important;height:63%!important;transform:none!important;translate:-50% 0;overflow:visible}
+.page--home #route-play{visibility:visible;pointer-events:auto;left:auto!important;top:auto!important;right:3rem!important;bottom:15rem!important;width:25rem!important;height:5rem!important;transform:none!important;z-index:22}
+.is-route-plan .equipment-floor{transform:translate(-100%,-100%)}
+.is-route-plan .equipment-labels{overflow:visible}
+.is-route-plan .equipment-legend{bottom:9rem;right:3rem}
+.equipment-marker .equipment-symbol{display:flex;margin:auto;width:4rem;height:4rem}
+.equipment-marker .equipment-symbol svg{visibility:visible}
+.equipment-labels.is-plan .equipment-symbol svg{visibility:visible}
+.equipment-legend{position:absolute;right:3rem;bottom:10rem;z-index:20;display:flex;gap:1.5rem;align-items:center;padding:.7rem 1rem;border:1px solid var(--brand-line);background:var(--bg-0,#071c30);color:var(--ink);font-size:1rem}
+.equipment-legend[hidden]{display:none}
+.equipment-legend>span{display:flex;align-items:center;gap:.5rem}
+.direction-key{color:#18bb65;font-size:2rem}
+.equipment-marker,.equipment-floor{position:absolute;transform:translate(-50%,-50%);text-align:center;white-space:nowrap}
+.equipment-box{display:block;width:2rem;height:2rem;margin:auto;border:2px solid #ff4545;box-shadow:0 0 8px #ff454560}
+.equipment-marker small{display:block;color:#17965c;font-size:.8rem;background:var(--bg-0,#071c30);padding:.15rem .35rem;margin-top:.25rem}
+.equipment-floor{color:var(--ink,#bcecff);font-size:1.2rem;font-weight:700;background:var(--bg-0,#071c30);padding:.25rem .5rem}
+.home__status-item i{white-space:nowrap}
+.home__status{display:none!important}
+html[data-theme="red"] #stage-home .stage__label{display:none!important}
+.equipment-floor{transform:translate(-100%,-100%);display:flex;align-items:flex-end;gap:.45rem;min-width:4.6rem;padding:0 .25rem 0 0;background:none;border-bottom:2px solid currentColor;color:var(--brand-hi);font-size:1.55rem;line-height:1.15}
+.equipment-floor[hidden]{display:none}
+.equipment-floor svg{width:1.55rem;height:1.05rem;overflow:visible;flex:none}
+.equipment-floor svg path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+.equipment-floor span{padding-bottom:.2rem}
+/* Keep the existing model size and camera animation; center its stage instead
+   of reserving space for the removed equipment panel. */
+#stage-home{left:50%!important;translate:-50% 0;transform-origin:50% 0!important}

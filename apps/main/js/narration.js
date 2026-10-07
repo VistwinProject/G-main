@@ -139,7 +139,7 @@ export function createNarration({navigate}){
     cuePreparation=Promise.resolve();sentenceWeights=null;clipSequence=[...files];clipQueue=files.slice(1);
     cues=[0];dockCaption.textContent='';controls.hidden=false;
     wave.setAttribute('aria-disabled','false');wave.setAttribute('aria-label','播放或暫停本頁旁白');
-    loadClip(files[0]);play();
+    loadClip(files[0]);return play();
   }
   window.addEventListener('narration:phase',event=>{
     const phase=event.detail;
@@ -283,7 +283,22 @@ export function createNarration({navigate}){
   window.addEventListener('keydown',onOrbKey);
   void setOrbEnabled(initialOrbEnabled);
   window.addEventListener('pagehide',event=>{if(!event.persisted){++orbRequest;window.removeEventListener('keydown',onOrbKey);clearInterval(voiceTimer);cancelAnimationFrame(raf);cancelAnimationFrame(watchFrame);clearTimeout(closingTimer);orb?.dispose();audio.pause();context?.close();}});
-  return {enter(id){++request;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];activeTopic=null;activeClip=null;lastCaptionKey=null;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
+  return {
+    clock(){return {page:current,clip:activeClip,time:audio.currentTime,duration:audio.duration};},
+    async seek(seconds){
+      const ticket=request;
+      await play();
+      if(ticket!==request||!Number.isFinite(audio.duration))return;
+      resetClosing();audio.currentTime=Math.max(0,Math.min(seconds,audio.duration-.01));
+      closingStarted=audio.currentTime>=(cues[2]??Infinity);sync();
+    },
+    playRoute(){return playClips(['route-play.mp3']);},
+    routeRemaining(){
+      if(current!=='home'||activeClip!=='route-play.mp3')return NaN;
+      const duration=Number.isFinite(audio.duration)?audio.duration:clipDuration;
+      return (duration-audio.currentTime)/audio.playbackRate;
+    },
+    enter(id){++request;const ticket=request;clipQueue=[];clipSequence=[];activeClipLines=[];activeTopic=null;activeClip=null;lastCaptionKey=null;audio.pause();resetClosing();cancelAnimationFrame(watchFrame);current=id;cuePreparation=Promise.resolve();sentenceWeights=null;error.textContent='';controls.hidden=!files[id]||id==='welcome';
     const file=files[id]||pageNarration[id]?.file;
     dock.hidden=id==='welcome';dock.dataset.page=id;dockCaption.textContent='';
     (id==='welcome'?welcomePage:dock).prepend(wave);

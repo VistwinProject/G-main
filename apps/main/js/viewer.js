@@ -1859,6 +1859,7 @@ export class Viewer {
   playRoute(name, {
     index = null, avoidCurrent = true, avoid = -1, duration = 2, onDone = null,
     whole = false,          // true = 整條路一開始就畫出來，只有線頭那顆亮點在跑
+    arrowsOnly = false,
     shot = null, shotBlend = 0.8,
     camHold = 0.5,          // 鏡頭在每個關鍵影格停幾秒（0 = 不停，一路滑過去）
   } = {}) {
@@ -1879,8 +1880,36 @@ export class Viewer {
     set.recent = [i, ...set.recent].slice(0, 2);
     set.groups.forEach((rg, k) => { rg.visible = k === i; });
     const e = set.entries[i];
+    if(name==='tower')this.routeFloor=5+Math.max(0,Math.min(2,Math.round((e.pts[0].y-35.361)/4.153)));
     this._drawRouteAt(e, 0, whole);
     if (set.runner) { set.runner.group.position.copy(e.tip); set.runner.group.visible = true; }
+    if(set.directionArrows)set.directionArrows.visible=false;
+    if(arrowsOnly){
+      set.groups.forEach(group=>{group.visible=false;});
+      if(set.runner)set.runner.group.visible=false;
+      if(set.directionArrows){
+        set.directionArrows.removeFromParent();
+        set.directionArrows.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});
+      }
+      const arrows=new THREE.Group();
+      const floorY=e.pts[0].y;
+      for(let j=1;j<e.pts.length;j++){
+        const a=e.pts[j-1],b=e.pts[j];
+        // Stop before the first stair descent, including sloped stair flights.
+        if(Math.abs(b.y-floorY)>.15||Math.abs(b.y-a.y)>.15)break;
+        const delta=b.clone().sub(a);delta.y=0;
+        const length=delta.length();if(length<.25)continue;
+        const direction=delta.normalize(),count=Math.max(1,Math.ceil(length/3));
+        for(let n=0;n<count;n++){
+          const segment=length/count,arrowLength=segment*.78;
+          const origin=a.clone().addScaledVector(direction,n*segment+segment*.1);origin.y+=.08;
+          const arrow=new THREE.ArrowHelper(direction,origin,arrowLength,0x18bb65,Math.min(.65,arrowLength*.35),Math.min(.45,arrowLength*.3));
+          arrow.traverse(o=>{if(o.material){o.material.depthTest=false;o.material.depthWrite=false;o.material.transparent=true;o.material.opacity=.15;}o.renderOrder=30;});
+          arrows.add(arrow);
+        }
+      }
+      set.root.add(arrows);set.directionArrows=arrows;
+    }
 
     // 這一條動線自己的運鏡（七個狀態共用 enterState 那套規則）
     const shotName = typeof shot === 'function' ? shot(i) : shot;
@@ -1892,7 +1921,7 @@ export class Viewer {
     const dur = typeof duration === 'function'
       ? duration(i, e.total, set.entries.map((x) => x.total), cam?.total ?? 0)
       : duration;
-    set.play = { i, t0: this.clock.getElapsedTime(), dur: Math.max(0.1, dur), onDone, done: false, whole };
+    set.play = { i, t0: this.clock.getElapsedTime(), dur: Math.max(0.1, dur), onDone, done: false, whole, arrowsOnly };
     if (keys) {
       set.play.keys = keys;
       set.play.cam = cam;
@@ -1929,13 +1958,14 @@ export class Viewer {
     s0.until = Infinity;              // 什麼時候收，等下一顆冒出來才決定
     f.i = i;                          // 「最新的那一顆」標在哪一條（idleFireRoute 用）
     f.on = true;                      // 待機起火點整體開著
-    f.auto = auto;                    // auto = 到時間就在離鏡頭最近的那幾條裡重挑
+    f.auto = auto && name !== 'tower'; // 03 待機只選一次，不隨運鏡輪換起火位置
+    f.back = 0;
     f.next = t + IDLE_FIRE.every;     // 沒在擺盪時的退路
     f.beat = beat0?.id ?? null;       // 目前踩在哪一拍（進場這一拍不再補發起火點）
     const info = beat0?.info ?? SWING_BEATS[0];
-    f.info = info;
+    f.info = name === 'tower' ? { ...info, green: false } : info;
     for (const s of f.slots) { s.dot.core.material.opacity = 1; }   // 上一輪可能停在淡出中
-    this._setSlabGreen(!!beat0 && info.green);
+    this._setSlabGreen(name !== 'tower' && !!beat0 && info.green);
     this.onIdleFire?.(i);             // 第一顆也算「新的起火點」
     // 進場先發一次 beat（first=true）：外面拿去把標語點亮，但按鈕不抽
     this.onSwingBeat?.({ ...info, dur: beat0?.dur ?? IDLE_FIRE.every, first: true });
@@ -2175,6 +2205,7 @@ export class Viewer {
     if (!set) return;
     set.play = null;
     set.groups.forEach((rg) => { rg.visible = false; });
+    if(set.directionArrows)set.directionArrows.visible=false;
     if (set.runner) set.runner.group.visible = false;
   }
 
@@ -2325,6 +2356,20 @@ export class Viewer {
         if (set.mode === 'manual') {                      // 首頁：只有按鈕按下去才播，播完停在出口等外面收掉
           const p = set.play;
           if (p) {
+            if(p.arrowsOnly&&set.directionArrows){
+              const arrows=set.directionArrows.children;
+              const duration=Math.max(1.2,arrows.length*.18+.65);
+              set.directionArrows.visible=true;
+              // Match Pad's staggered wave: brighten, briefly hold, then fade.
+              arrows.forEach((arrow,index)=>{
+                const elapsed=t-p.t0-index*.18;
+                const phase=elapsed<0?0:(elapsed%duration)/duration;
+                const opacity=phase<.08?.15+.85*phase/.08
+                  :phase<.16?1:phase<.36?1-.85*(phase-.16)/.2:.15;
+                arrow.line.material.opacity=opacity;
+                arrow.cone.material.opacity=opacity;
+              });
+            }
             const tau = Math.min(1, (t - p.t0) / p.dur);
             const e = set.entries[p.i];
             // 動線上的點：**照時間等速**跑完整條，不受鏡頭影響
@@ -2343,8 +2388,10 @@ export class Viewer {
                 this._lerpView(p.from, onPath, bk * bk * (3 - 2 * bk));
               }
             }
-            this._drawRouteAt(e, k, p.whole);
-            if (set.runner) set.runner.group.position.copy(e.tip);
+            if(!p.arrowsOnly){
+              this._drawRouteAt(e, k, p.whole);
+              if (set.runner) set.runner.group.position.copy(e.tip);
+            }
             if (tau >= 1 && !p.done) { p.done = true; const cb = p.onDone; p.onDone = null; cb?.(); }
           }
         } else if (set.off) {                             // 前言頁：整組收起來（setRoutesVisible）
@@ -2443,7 +2490,56 @@ export class Viewer {
       if (this._motionPaused || this._hold || this._fly) this.controls.autoRotate = false;
       this.controls.update();
       this.controls.autoRotate = spin;
+      // Architectural two-point perspective: keep the rendered camera level,
+      // using lens shift to keep the original orbit target in the same place.
+      // Restore after drawing so saved shots and OrbitControls remain unchanged.
+      let architecturalView = null;
+      let topView = null;
+      if(this.sceneName==='tower'&&this.routeTopView&&this.customModels.tower){
+        topView={position:this.camera.position.clone(),quaternion:this.camera.quaternion.clone(),up:this.camera.up.clone()};
+        const model=this.customModels.tower;
+        model.updateWorldMatrix(true,false);
+        const center=model.localToWorld(new THREE.Vector3(-7.87,39.55,-19.175));
+        const scale=model.getWorldScale(new THREE.Vector3());
+        // Fit the actual tower footprint tightly into the requested plan rectangle.
+        // Half extents: X=8.96, Z=20.225; top is 5.55 above the view target.
+        const halfHeight=Math.max(8.96*Math.abs(scale.x),20.225*Math.abs(scale.z)/this.camera.aspect);
+        const distance=halfHeight/Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*1.015+5.55*Math.abs(scale.y);
+        this.camera.position.copy(center).add(new THREE.Vector3(0,distance,0));
+        this.camera.up.set(1,0,0); // Building's long axis runs horizontally.
+        this.camera.lookAt(center);
+        this.camera.updateMatrixWorld();
+      }else if(this.sceneName==='tower'){
+        const target=this.controls.target,position=this.camera.position;
+        const distance=Math.hypot(target.x-position.x,target.z-position.z);
+        if(distance>.01){
+          architecturalView={quaternion:this.camera.quaternion.clone(),shift:this.camera.projectionMatrix.elements[9]};
+          this.camera.lookAt(target.x,position.y,target.z);
+          this.camera.projectionMatrix.elements[9]=this.camera.projectionMatrix.elements[5]*(target.y-position.y)/distance;
+          this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+          this.camera.updateMatrixWorld();
+        }
+      }
+      if(this.sceneName==='tower'){
+        for(const b of this._routeSets?.tower?.startDots??[]) b.group.visible=false;
+      }
+      const equipmentShiftX=this.camera.projectionMatrix.elements[8];
+      this.onEquipmentFrame?.();
       this.renderer.render(this.scene, this.camera);
+      this.camera.projectionMatrix.elements[8]=equipmentShiftX;
+      this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+      if(topView){
+        this.camera.position.copy(topView.position);
+        this.camera.quaternion.copy(topView.quaternion);
+        this.camera.up.copy(topView.up);
+        this.camera.updateMatrixWorld();
+      }
+      if(architecturalView){
+        this.camera.quaternion.copy(architecturalView.quaternion);
+        this.camera.projectionMatrix.elements[9]=architecturalView.shift;
+        this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+        this.camera.updateMatrixWorld();
+      }
     };
     loop();
   }
