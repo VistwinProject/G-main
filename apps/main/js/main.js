@@ -1,6 +1,7 @@
 import { Viewer } from './viewer.js';
 import { createEquipment } from './equipment.js';
 import { createNarrationPages, createNarration } from './narration.js';
+import {lightingEffect} from './lighting-state.js';
 import { createPreventionPage } from './information.js';
 import { createCountdown } from './countdown.js';
 import { createEditor } from './editor.js';
@@ -128,12 +129,40 @@ const sync = createSync({
       now 很舊的狀態，算出來的進度會停在當初推的那一刻。 */
 let anim = null;
 let preventionInfo=null;
+let lightingEnded=false;
+let lightingPreview=null;
+function previewLighting(effect){
+  if(!document.documentElement.classList.contains('is-autorun'))return;
+  lightingPreview={effect,until:performance.now()+3000};pushLighting();
+}
+window.addEventListener('lighting:preview',({detail})=>previewLighting(detail.effect));
+window.addEventListener('lighting:cancel',()=>{lightingPreview=null;});
+function pushLighting(){
+  let effect=lightingEffect(current,routeState,lightingEnded);
+  if(lightingPreview){
+    if(effect===lightingPreview.effect||performance.now()>lightingPreview.until)lightingPreview=null;
+    else effect=lightingPreview.effect;
+  }
+  sync.send({type:'lighting',effect});
+}
+window.addEventListener('narration:playing',({detail})=>{
+  lightingEnded=false;pushLighting();
+});
+window.addEventListener('show:ended',()=>{lightingPreview=null;lightingEnded=true;pushLighting();});
+window.addEventListener('narration:ended',({detail})=>{
+  if(detail.page==='outro'&&!document.documentElement.classList.contains('is-autorun')){
+    lightingEnded=true;pushLighting();
+  }
+});
+// Re-send desired state after reconnect; the server deduplicates confirmed commands.
+setInterval(pushLighting,1000);
 window.addEventListener('narration:level',e=>sync.send({type:'voice',...e.detail}));
 window.addEventListener('information:selection',event=>{preventionInfo=event.detail;pushSync();});
 const HEARTBEAT = 1000;
 
 /** 把目前狀態推給 Pad。切頁、開始跑動線、通關、回待機都要叫一次。 */
 function pushSync() {
+  pushLighting();
   const live = routeState === 'running' || routeState === 'cleared';
   sync.send({
     scene: SCENE[current] ?? 'intro',
@@ -369,7 +398,9 @@ function goto(id, {remote=false} = {}) {
   if (id === 'first' || id === 'prevention') id = 'home';
   if (!pageEls.has(id) || id === current) return;
   current = id;
+  lightingPreview=null;
   narration.enter(id);
+  lightingEnded=false;
   document.getElementById('app').classList.toggle('showing-welcome', id === 'welcome');
   for (const [key, el] of pageEls) el.classList.toggle('is-active', key === id);
   document.querySelectorAll('[data-go-page]').forEach(button => {
@@ -729,6 +760,9 @@ async function playRouteDemo(repeat) {
       },
     });
     finishAfterRouteVoice = () => {
+        setTimeout(()=>{
+          if(playbackRequest===routePlaybackRequest&&current==='home'&&routeState==='running')previewLighting('green');
+        },Math.max(0,EXIT_HOLD+(blackoutEl?FADE_OUT:0)-500));
         // 抵達出口先停 EXIT_HOLD 毫秒 —— 這段期間動線畫著、小人站在綠色出口上不動，
         // 讓人看清楚他到了，再黑掉切通關。中途按按鈕或離開首頁要把這個計時器取消掉。
         clearTimeout(exitTimer);
