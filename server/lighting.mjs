@@ -1,5 +1,7 @@
 import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+// Map logical show signals to fixture colors at the output boundary.
+const outputColors={green:'red',red:'blue',blue:'green',off:'off'};
 export function createLighting({port=process.env.G_LIGHT_PORT||'COM3',enabled=process.platform==='win32'&&process.env.G_LIGHT_DISABLED!=='1',run=execFile}={}){
   let desired=null,confirmed=null,busy=false,failed=null;
   function pump(){
@@ -7,7 +9,7 @@ export function createLighting({port=process.env.G_LIGHT_PORT||'COM3',enabled=pr
     const effect=desired;if(!effect)return;
     const transition=confirmed==='green'&&effect==='blue'?900:200;
     busy=true;
-    run('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('./g-light.ps1',import.meta.url)),'-Effect',effect,'-Port',port,'-TransitionMs',String(transition)],{windowsHide:true,timeout:20000},(error,stdout,stderr)=>{
+    run('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('./g-light.ps1',import.meta.url)),'-Effect',outputColors[effect],'-Port',port,'-TransitionMs',String(transition)],{windowsHide:true,timeout:20000},(error,stdout,stderr)=>{
       busy=false;
       if(error){failed=effect;console.error('[G-light]',effect,'FAILED',stderr||error.message);}
       else{confirmed=effect;failed=null;console.log('[G-light]',stdout.trim());}

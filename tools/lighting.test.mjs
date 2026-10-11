@@ -13,8 +13,21 @@ light.set('green');calls[2].cb(new Error('disconnected'),'','');
 light.set('green');assert.equal(calls.length,3);
 light.set('off');assert.equal(light.status().confirmed,'off');
 light.set('blue');assert.equal(calls.length,4);
-assert.equal(calls[3].args[calls[3].args.indexOf('-Effect')+1],'blue');
+assert.equal(calls[3].args[calls[3].args.indexOf('-Effect')+1],'green');
 calls[3].cb(null,'confirmed blue','');light.set('blue');assert.equal(calls.length,4);
 light.set('green');assert.equal(calls[4].args.at(-1),'200');calls[4].cb(null,'confirmed green','');
 light.set('blue');assert.equal(calls[5].args.at(-1),'900');calls[5].cb(null,'confirmed blue','');
 console.log('PASS: deduplication, single-flight, latest request, invalid effect, no failure loop');
+
+const mapped=[];
+const mappedLight=createLighting({enabled:true,run:(file,args,options,cb)=>{mapped.push(args[args.indexOf('-Effect')+1]);cb(null,'ok','');}});
+for(const signal of ['green','red','blue','off'])mappedLight.set(signal);
+assert.deepEqual(mapped,['red','blue','green','off']);
+console.log('PASS: corrected fixture outputs; off preserved');
+
+const {lightingEffect}=await import('../apps/main/js/lighting-state.js');
+const introCommands=[];
+const introLight=createLighting({enabled:true,run:(file,args,options,cb)=>{introCommands.push(args[args.indexOf('-Effect')+1]);cb(null,'ok','');}});
+introLight.set(lightingEffect('intro'));
+assert.deepEqual(introCommands,['blue']);
+console.log('PASS: intro sends blue to the fixture');

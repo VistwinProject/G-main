@@ -156,7 +156,7 @@
    ========================================================= */
 :root[data-skin="light"],
 :root[data-skin="light"][data-theme="blue"]{
-  --bg-0:#ffffff;        /* 基底白。畫布留邊（letterbox）也是這個色 */
+  --bg-0:#ffffff;        /* 淺色背景基底 */
   --bg-1:#eef5fd;
   --bg-2:#e2edfa;
 
@@ -339,7 +339,7 @@ body{
   -webkit-font-smoothing:antialiased;
   cursor:default;
   /* 畫布置中：視窗比例不是 2.1333 時，在上下（較高的視窗）或左右（超寬視窗）留邊，
-     邊的顏色就是 --bg-0。這樣任何螢幕、任何視窗大小看到的構圖都一模一樣。 */
+     背景由各頁延伸至整個視窗，內容維持相同構圖。 */
   display:grid;place-items:center;
 }
 
@@ -389,10 +389,6 @@ svg{display:block}
 .page--main{
   display:flex;flex-direction:column;
   padding:2.2rem 2.6rem 1.1rem;
-  background:
-    radial-gradient(120% 90% at 50% -10%, var(--glow-1), transparent 60%),
-    radial-gradient(80% 70% at 50% 55%, var(--glow-2), transparent 70%),
-    linear-gradient(170deg, var(--bg-1) 0%, var(--bg-0) 65%);
 }
 
 /* 細微掃描線 */
@@ -715,10 +711,6 @@ svg{display:block}
   display:flex;flex-direction:column;
   /* 下方留白跟 .page--main 一樣，右下標語才會和第一頁的「火災無情」同高 */
   padding:2.4rem 2.8rem 1.1rem;
-  background:
-    radial-gradient(120% 90% at 50% -10%, var(--glow-1), transparent 60%),
-    radial-gradient(80% 70% at 40% 55%, var(--glow-2), transparent 70%),
-    linear-gradient(170deg, var(--bg-1) 0%, var(--bg-0) 65%);
 }
 
 .home{
@@ -768,21 +760,7 @@ svg{display:block}
 .page--outro{
   display:flex;align-items:center;justify-content:center;
   padding:2.2rem 2.6rem;
-  /* 底圖：跟另外兩頁同一組 --glow，但**光心放在畫面中間**（那兩頁是從上緣打下來的），
-     再用最底下那層由上到下的漸層讓上下兩端沉下去 */
-  background:
-    /* 第一層 = 暈影，四周壓暗。稿子的邊角比中間深很多，少了這一層整片會很平。
-       ⚠️ **一定要做成 background 的一層，不要另外開一個 ::before**：
-          多一層定位元素就得給 .intro__body 加 position:relative，
-          那會讓它變成子物件的 offsetParent，**編輯模式存的座標基準就整個換掉**，
-          舊的 layout-intro.json 會整批跑位。背景層本來就畫在所有內容底下，不用碰定位。 */
-    radial-gradient(118% 88% at 50% 46%,
-      transparent 42%,
-      color-mix(in srgb, var(--bg-0) 78%, transparent) 78%,
-      var(--bg-0) 100%),
-    radial-gradient(115% 85% at 50% 44%, var(--glow-1), transparent 62%),
-    radial-gradient(70% 55% at 50% 30%, var(--glow-2), transparent 72%),
-    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 46%, var(--bg-0) 100%);
+
 }
 .intro__body{
   display:flex;flex-direction:column;align-items:center;
@@ -1626,3 +1604,48 @@ svg{display:block}
   transition:opacity .22s var(--ease);
 }
 .blackout.is-on{opacity:1}
+
+/* Extend the scene background without changing saved canvas coordinates. */
+body:has(.page--main.is-active){
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(80% 70% at 50% 55%, var(--glow-2), transparent 70%),
+    linear-gradient(170deg, var(--bg-1) 0%, var(--bg-0) 65%);
+}
+
+/* Extend the scene background without changing saved canvas coordinates. */
+body:has(.page--home.is-active){
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(80% 70% at 40% 55%, var(--glow-2), transparent 70%),
+    linear-gradient(170deg, var(--bg-1) 0%, var(--bg-0) 65%);
+}
+
+/* Continue the scan texture through the viewport letterbox area. */
+body:has(.page.is-active){isolation:isolate}
+body:has(.page.is-active)::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:repeating-linear-gradient(0deg,var(--grain-line) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:var(--grain-op);
+}
+.page > .grain{display:none}
+
+/* Intro and outro also paint the entire viewport. */
+body:has(.page--intro.is-active),
+body:has(.page--outro.is-active){
+  /* 底圖：跟另外兩頁同一組 --glow，但**光心放在畫面中間**（那兩頁是從上緣打下來的），
+     再用最底下那層由上到下的漸層讓上下兩端沉下去 */
+  background:
+    /* 第一層 = 暈影，四周壓暗。稿子的邊角比中間深很多，少了這一層整片會很平。
+       ⚠️ **一定要做成 background 的一層，不要另外開一個 ::before**：
+          多一層定位元素就得給 .intro__body 加 position:relative，
+          那會讓它變成子物件的 offsetParent，**編輯模式存的座標基準就整個換掉**，
+          舊的 layout-intro.json 會整批跑位。背景層本來就畫在所有內容底下，不用碰定位。 */
+    radial-gradient(118% 88% at 50% 46%,
+      transparent 42%,
+      color-mix(in srgb, var(--bg-0) 78%, transparent) 78%,
+      var(--bg-0) 100%),
+    radial-gradient(115% 85% at 50% 44%, var(--glow-1), transparent 62%),
+    radial-gradient(70% 55% at 50% 30%, var(--glow-2), transparent 72%),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 46%, var(--bg-0) 100%);
+}

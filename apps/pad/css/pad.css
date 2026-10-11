@@ -894,3 +894,6 @@ body.pad[data-view="prevention"] .pad__prevention{
 .lock__icon{margin-bottom:.5rem}
 .lock__clock{font-size:4.8rem}
 .lock__date{font-size:1.25rem;margin-top:.5rem}
+
+/* Keep connection state available to scripts without showing the top status bar. */
+body.pad .pad__bar{display:none}

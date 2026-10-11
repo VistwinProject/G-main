@@ -13,7 +13,13 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+$nodeExe = if ($nodeCommand) { $nodeCommand.Source } else { $null }
+if (-not $nodeExe) {
+  $bundledNode = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
+  if (Test-Path -LiteralPath $bundledNode) { $nodeExe = $bundledNode }
+}
+if (-not $nodeExe) {
   Write-Host ''
   Write-Host '  [錯誤] 找不到 node。請先安裝 Node.js 再試一次：https://nodejs.org/' -ForegroundColor Red
   Write-Host ''
@@ -53,7 +59,7 @@ Write-Host '   關掉這個視窗就等於關掉伺服器。'
 Write-Host '  -----------------------------------------------------------'
 Write-Host ''
 
-node server\server.mjs $Port
+& $nodeExe server\server.mjs $Port
 
 Write-Host ''
 Write-Host '  伺服器已停止。'
